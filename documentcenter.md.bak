@@ -1,0 +1,240 @@
+You need a Document Center / Employee 201 Module. Do not make 201, NTE, and NOD as random pages. Put them inside the employee profile and HR document workflow.
+1. Where to put it in the system
+Sidebar:
+HR
+ ├── Employees
+ ├── 201 Files
+ ├── Documents
+ └── Disciplinary
+Inside each employee profile:
+Employee Profile
+ ├── Personal Info
+ ├── Employment Info
+ ├── Attendance
+ ├── Payroll
+ ├── Leaves
+ ├── Loans
+ ├── 201 File
+ ├── Disciplinary
+ └── Audit History
+2. 201 File Module
+The 201 file is the complete employee record.
+Each employee must have a digital 201 folder containing:
+Personal Information
+Employment Contract
+Government IDs
+Resume / CV
+Application Form
+Job Offer
+Medical Records
+Training Certificates
+Performance Evaluations
+Payslip / Payroll Documents
+Leave Records
+Warnings
+NTE
+NOD
+Clearance
+Resignation Letter
+COE
+Final Pay Documents
+201 File features
+Your devs should build:
+Upload document
+Tag document type
+Set visibility
+Set expiry date
+Request missing document
+Approve/reject uploaded document
+Download document
+Archive document
+Audit trail
+Document statuses
+Pending Upload
+Uploaded
+For Review
+Approved
+Rejected
+Expired
+Archived
+Database table
+employee_documents
+- id
+- employee_id
+- document_type
+- document_title
+- file_path
+- status
+- visibility
+- expiry_date
+- uploaded_by
+- reviewed_by
+- reviewed_at
+- remarks
+- created_at
+- updated_at
+Visibility:
+HR only
+Manager view
+Employee view
+Payroll view
+Admin only
+3. NTE Module — Notice to Explain
+NTE is used when the employee has an incident/violation and the company asks for their written explanation.
+Put it under:
+Employee Profile → Disciplinary → Create NTE
+Or:
+HR → Disciplinary → New Case
+NTE workflow
+1. HR creates incident case
+2. HR selects employee
+3. HR selects violation type
+4. HR writes incident details
+5. System generates NTE document
+6. NTE is sent/released to employee
+7. Employee submits explanation
+8. HR reviews explanation
+9. Case moves to decision stage
+NTE fields
+Case number
+Employee name
+Position
+Department
+Incident date/time
+Incident location
+Violation type
+Policy violated
+Incident description
+Evidence attachments
+Deadline to respond
+HR/person issuing NTE
+Employee explanation field
+Acknowledgment status
+NTE statuses
+Draft
+Issued
+Acknowledged
+Explanation Submitted
+No Response
+Under Review
+Closed
+Moved to NOD
+Database tables
+disciplinary_cases
+- id
+- case_number
+- employee_id
+- violation_type
+- incident_date
+- incident_location
+- description
+- policy_reference
+- status
+- created_by
+- created_at
+nte_records
+- id
+- case_id
+- employee_id
+- response_deadline
+- nte_document_id
+- issued_at
+- acknowledged_at
+- employee_explanation
+- explanation_submitted_at
+- status
+4. NOD Module — Notice of Decision
+NOD is generated after HR reviews the employee explanation and decides the action.
+Put it under:
+Disciplinary Case → Create NOD
+NOD workflow
+1. HR reviews NTE explanation
+2. HR selects decision
+3. HR selects sanction, if any
+4. System generates NOD
+5. Employee receives NOD
+6. Employee acknowledges
+7. Case is closed or sanction is monitored
+NOD decision types
+No violation found
+Verbal warning
+Written warning
+Final warning
+Suspension
+Termination
+Salary deduction, if allowed by policy/law
+Training required
+Performance improvement plan
+NOD fields
+Case number
+Employee name
+Incident summary
+Employee explanation summary
+Findings
+Decision
+Sanction
+Effective date
+Duration, if suspension
+Return-to-work date
+Authorized signatory
+Acknowledgment section
+NOD statuses
+Draft
+Issued
+Acknowledged
+Sanction Active
+Completed
+Closed
+Database table
+nod_records
+- id
+- case_id
+- employee_id
+- decision
+- sanction_type
+- sanction_start_date
+- sanction_end_date
+- decision_details
+- nod_document_id
+- issued_at
+- acknowledged_at
+- status
+5. Disciplinary dashboard
+Add page:
+HR → Disciplinary
+Show cards:
+Open Cases
+Pending Employee Explanation
+For HR Review
+NOD Pending Acknowledgment
+Suspensions Active
+Closed Cases
+Table columns:
+Case No.
+Employee
+Violation
+Incident Date
+Status
+Deadline
+Assigned HR
+Action
+6. Document generation
+For 201, NTE, and NOD, use the same document engine.
+Flow:
+Template
+→ Merge employee/case data
+→ Generate PDF
+→ Save to employee 201 file
+→ Send notification
+→ Track acknowledgment
+Templates needed:
+NTE Template
+NOD Template
+COE Template
+Clearance Template
+Final Pay Release Template
+Warning Letter Template
+7. Important rule
+Every NTE and NOD must automatically be saved inside:
+Employee Profile → 201 File → Disciplinary Records
+
