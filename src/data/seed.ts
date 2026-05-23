@@ -18,7 +18,8 @@ import type {
 } from "@/types";
 
 // ─── Demo Users ──────────────────────────────────────────────
-// All demo accounts use password: demo1234
+// Demo mode (NEXT_PUBLIC_DEMO_MODE=true): password is demo1234
+// Production / Supabase: password is Admin@2024
 export const DEMO_USERS: DemoUser[] = [
     // ── System role accounts ──────────────────────────────────
     { id: "U001", name: "Alex Rivera",  role: "admin",         email: "admin@premiumoutlets.com.ph" },

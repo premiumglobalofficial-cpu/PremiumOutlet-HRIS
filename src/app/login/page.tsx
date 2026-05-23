@@ -150,7 +150,7 @@ export default function LoginPage() {
         if (USE_DEMO_MODE) {
             handleDemoLogin(demoEmail, "demo1234");
         } else {
-            handleSupabaseLogin(demoEmail, "demo1234");
+            handleSupabaseLogin(demoEmail, "Admin@2024");
         }
     };
 
@@ -330,7 +330,7 @@ export default function LoginPage() {
                         <div className="mt-4 text-center">
                             <p className="text-xs text-muted-foreground font-medium">
                                 <span className="opacity-80">Default password: </span>
-                                <code className="font-mono bg-muted/50 border border-border/50 px-2 py-0.5 rounded text-[11px] select-all">demo1234</code>
+                                <code className="font-mono bg-muted/50 border border-border/50 px-2 py-0.5 rounded text-[11px] select-all">{USE_DEMO_MODE ? "demo1234" : "Admin@2024"}</code>
                             </p>
                         </div>
                     </div>
