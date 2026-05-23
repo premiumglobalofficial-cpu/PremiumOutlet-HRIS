@@ -23,7 +23,7 @@ interface PrintablePayslipProps {
 }
 
 export function PrintablePayslip({
-    payslip, employeeName, department, companyName = "Soren Data Solutions Inc.", logoUrl, jobTitle, employeeId, authorizedSignature, open, onClose,
+    payslip, employeeName, department, companyName = "Premium Outlets", logoUrl, jobTitle, employeeId, authorizedSignature, open, onClose,
 }: PrintablePayslipProps) {
     const printRef = useRef<HTMLDivElement>(null);
 

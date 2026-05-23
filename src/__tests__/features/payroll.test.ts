@@ -1,5 +1,5 @@
 /**
- * Payroll tests — NexHRMS
+ * Payroll tests — Premium Outlets HRIS
  * Tests PH statutory deduction calculations, payroll store logic, and payslip lifecycle.
  *
  * Coverage:

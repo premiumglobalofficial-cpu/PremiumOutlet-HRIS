@@ -1,9 +1,10 @@
 /**
- * NexHRMS Service Worker
+ * Premium Outlets HRIS Service Worker
  * Handles push notifications and caching for PWA functionality.
+ * Powered by Nexvision Innovations Inc.
  */
 
-const CACHE_NAME = 'nexhrms-v1';
+const CACHE_NAME = 'po-hris-v1';
 const OFFLINE_URL = '/login';
 
 // Install event — cache essential assets
@@ -85,11 +86,11 @@ self.addEventListener('push', (event) => {
   console.log('[SW] Push received:', event);
 
   let data = {
-    title: 'NexHRMS Notification',
+    title: 'Premium Outlets HRIS Notification',
     body: 'You have a new notification',
     icon: '/android-chrome-192x192.png',
     badge: '/android-chrome-192x192.png',
-    tag: 'nexhrms-notification',
+    tag: 'po-hris-notification',
     data: { url: '/notifications' },
   };
 
@@ -102,7 +103,7 @@ self.addEventListener('push', (event) => {
         body: payload.body || data.body,
         icon: payload.icon || data.icon,
         badge: payload.badge || data.badge,
-        tag: payload.tag || `nexhrms-${Date.now()}`,
+        tag: payload.tag || `po-hris-${Date.now()}`,
         data: {
           url: payload.url || payload.link || '/notifications',
           notificationId: payload.notificationId,

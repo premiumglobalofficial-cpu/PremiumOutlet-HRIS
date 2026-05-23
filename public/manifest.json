@@ -1,12 +1,12 @@
 {
-  "name": "NexHRMS",
-  "short_name": "NexHRMS",
-  "description": "Human Resource Management System",
+  "name": "Premium Outlets HRIS",
+  "short_name": "PO HRIS",
+  "description": "Premium Outlets Human Resource Information System — Powered by Nexvision Innovations Inc.",
   "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#0f172a",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",

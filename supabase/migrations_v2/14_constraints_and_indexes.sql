@@ -100,6 +100,36 @@ IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_tg_project') THEN
 END IF;
 END $$;
 
+-- ═══ Deferred FKs: attendance tables → projects / kiosk_devices ═══
+
+DO $$ BEGIN
+IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_pvm_project') THEN
+  ALTER TABLE public.project_verification_methods
+    ADD CONSTRAINT fk_pvm_project FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE;
+END IF;
+END $$;
+
+DO $$ BEGIN
+IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_mci_project') THEN
+  ALTER TABLE public.manual_checkins
+    ADD CONSTRAINT fk_mci_project FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE SET NULL;
+END IF;
+END $$;
+
+DO $$ BEGIN
+IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_qrt_device') THEN
+  ALTER TABLE public.qr_tokens
+    ADD CONSTRAINT fk_qrt_device FOREIGN KEY (device_id) REFERENCES public.kiosk_devices(id) ON DELETE CASCADE;
+END IF;
+END $$;
+
+DO $$ BEGIN
+IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_kp_device') THEN
+  ALTER TABLE public.kiosk_pins
+    ADD CONSTRAINT fk_kp_device FOREIGN KEY (kiosk_device_id) REFERENCES public.kiosk_devices(id) ON DELETE CASCADE;
+END IF;
+END $$;
+
 -- ═══ Payslip references (SET NULL on delete) ═══
 
 DO $$ BEGIN

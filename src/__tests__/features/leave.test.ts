@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 /**
- * Leave Store Tests — NexHRMS
+ * Leave Store Tests — Premium Outlets HRIS
  * Tests leave request lifecycle, balance management, policy enforcement, and conflict detection
  */
 

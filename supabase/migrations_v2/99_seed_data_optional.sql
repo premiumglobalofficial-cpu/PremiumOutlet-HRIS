@@ -24,7 +24,7 @@ INSERT INTO public.location_config (id) VALUES ('default')
 ON CONFLICT (id) DO NOTHING;
 
 -- ─── Default Appearance Config ────────────────────────────
-INSERT INTO public.appearance_config (id, company_name) VALUES ('default', 'NexHRMS')
+INSERT INTO public.appearance_config (id, company_name) VALUES ('default', 'Premium Outlets')
 ON CONFLICT (id) DO NOTHING;
 
 -- ─── Default Shift Template ──────────────────────────────

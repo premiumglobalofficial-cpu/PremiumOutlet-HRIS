@@ -191,6 +191,6 @@ export const useKioskStore = create<KioskStore>()(
         }).catch(() => {});
       },
     }),
-    { name: "soren-kiosk-settings", storage: safePersistStorage }
+    { name: "po-hris-kiosk-settings", storage: safePersistStorage }
   )
 );

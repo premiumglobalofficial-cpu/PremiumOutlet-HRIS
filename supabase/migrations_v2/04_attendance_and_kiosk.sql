@@ -224,7 +224,7 @@ CREATE INDEX IF NOT EXISTS idx_face_enrollments_active ON face_enrollments(is_ac
 
 CREATE TABLE IF NOT EXISTS project_verification_methods (
   id TEXT PRIMARY KEY DEFAULT 'PVM-' || gen_random_uuid()::text,
-  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL,
   verification_method TEXT NOT NULL CHECK (verification_method IN (
     'face_only', 
     'qr_only', 
@@ -248,7 +248,7 @@ CREATE INDEX IF NOT EXISTS idx_project_verification_methods_project ON project_v
 
 CREATE TABLE IF NOT EXISTS qr_tokens (
   id TEXT PRIMARY KEY DEFAULT 'QRT-' || gen_random_uuid()::text,
-  device_id TEXT NOT NULL REFERENCES kiosk_devices(id) ON DELETE CASCADE,
+  device_id TEXT NOT NULL,
   employee_id TEXT REFERENCES employees(id) ON DELETE SET NULL,
   token TEXT NOT NULL UNIQUE,
   expires_at TIMESTAMPTZ NOT NULL,
@@ -326,7 +326,7 @@ CREATE TABLE IF NOT EXISTS manual_checkins (
   custom_reason TEXT,
   performed_by TEXT NOT NULL REFERENCES employees(id),
   timestamp_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+  project_id TEXT,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -342,7 +342,7 @@ CREATE INDEX IF NOT EXISTS idx_manual_checkins_performed_by ON manual_checkins(p
 
 CREATE TABLE IF NOT EXISTS kiosk_pins (
   id TEXT PRIMARY KEY DEFAULT 'KP-' || gen_random_uuid()::text,
-  kiosk_device_id TEXT REFERENCES kiosk_devices(id) ON DELETE CASCADE,
+  kiosk_device_id TEXT,
   pin_hash TEXT NOT NULL,
   created_by TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -358,24 +358,25 @@ CREATE INDEX IF NOT EXISTS idx_kiosk_pins_active ON kiosk_pins(is_active);
 -- Add verification_method column to projects table (denormalized for performance)
 -- ─────────────────────────────────────────────────────────────────────────────
 
+-- NOTE: verification_method, require_geofence, geofence_radius_meters are now
+-- declared directly on the projects CREATE TABLE in 08_tasks_projects_messaging.sql.
+-- This DO block is kept for backwards compatibility when running independently.
 DO $$ 
-BEGIN 
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'projects' 
-    AND column_name = 'verification_method'
-  ) THEN
-    ALTER TABLE public.projects 
-    ADD COLUMN verification_method TEXT CHECK (verification_method IN (
-      'face_only', 'qr_only', 'face_or_qr', 'manual_only'
-    )) DEFAULT 'face_or_qr';
-    
-    ALTER TABLE public.projects 
-    ADD COLUMN require_geofence BOOLEAN DEFAULT true;
-    
-    ALTER TABLE public.projects 
-    ADD COLUMN geofence_radius_meters INTEGER DEFAULT 100;
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='projects') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'projects' 
+      AND column_name = 'verification_method'
+    ) THEN
+      ALTER TABLE public.projects 
+        ADD COLUMN verification_method TEXT CHECK (verification_method IN (
+          'face_only', 'qr_only', 'face_or_qr', 'manual_only'
+        )) DEFAULT 'face_or_qr',
+        ADD COLUMN require_geofence BOOLEAN DEFAULT true,
+        ADD COLUMN geofence_radius_meters INTEGER DEFAULT 100;
+    END IF;
   END IF;
 END $$;
 
@@ -389,6 +390,15 @@ BEGIN
   RETURN public.get_user_role() = 'admin';
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Helper: check if current user is the given employee (used by RLS policies)
+CREATE OR REPLACE FUNCTION public.is_own_employee(emp_id text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.employees
+    WHERE id = emp_id AND profile_id = auth.uid()
+  );
+$$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Auto-update triggers for updated_at columns
@@ -760,52 +770,11 @@ COMMENT ON COLUMN public.face_enrollments.reference_image IS
 
 -- ----------------------------------------------------------------------------
 -- SOURCE: 033_fix_location_pings_rls.sql
+-- NOTE: location_pings, site_survey_photos, and break_records are created in
+-- 08_tasks_projects_messaging.sql (runs after this file). These RLS policies
+-- are applied in 15_rls_policies.sql which runs after migration 08.
+-- Skipping here to avoid forward-reference errors on fresh install.
 -- ----------------------------------------------------------------------------
--- ============================================================
--- 033_fix_location_pings_rls.sql
--- Fixes INSERT/UPSERT RLS on location-related tables so that
--- both the owning employee AND admin/HR can write records.
---
--- Root cause: lp_insert / ssp_insert / br_manage only allowed
--- one side (employee-only or admin-only). The sync write-through
--- subscriber runs under the currently authenticated user's JWT,
--- which may be an admin who is also tracked, or an employee
--- whose profile_id link was not yet established — causing
--- "new row violates row-level security policy" on inserts.
--- ============================================================
-
--- ─── location_pings ──────────────────────────────────────────
--- Allow the owning employee OR any admin/HR member to insert.
-DROP POLICY IF EXISTS lp_insert ON public.location_pings;
-CREATE POLICY lp_insert ON public.location_pings
-    FOR INSERT WITH CHECK (
-        public.is_own_employee(employee_id) OR public.is_admin_or_hr()
-    );
-
--- ─── site_survey_photos ──────────────────────────────────────
--- Same pattern — selfies are submitted by employees but an
--- admin may also need to write on their behalf.
-DROP POLICY IF EXISTS ssp_insert ON public.site_survey_photos;
-CREATE POLICY ssp_insert ON public.site_survey_photos
-    FOR INSERT WITH CHECK (
-        public.is_own_employee(employee_id) OR public.is_admin_or_hr()
-    );
-
--- ─── break_records ───────────────────────────────────────────
--- Previous br_manage (FOR ALL) only covered admin.
--- Add separate employee-scoped INSERT and UPDATE policies so
--- employees can create and close their own break records.
-DROP POLICY IF EXISTS br_insert_own ON public.break_records;
-CREATE POLICY br_insert_own ON public.break_records
-    FOR INSERT WITH CHECK (
-        public.is_own_employee(employee_id) OR public.is_admin_or_hr()
-    );
-
-DROP POLICY IF EXISTS br_update_own ON public.break_records;
-CREATE POLICY br_update_own ON public.break_records
-    FOR UPDATE
-    USING  (public.is_own_employee(employee_id) OR public.is_admin_or_hr())
-    WITH CHECK (public.is_own_employee(employee_id) OR public.is_admin_or_hr());
 
 
 -- ----------------------------------------------------------------------------
@@ -856,41 +825,8 @@ ON CONFLICT (id) DO UPDATE SET
     work_type       = EXCLUDED.work_type,
     updated_at      = NOW();
 
--- ─── 2. Insert face-only project ─────────────────────────────────────────────
-INSERT INTO public.projects (
-    id, name, description,
-    location_lat, location_lng, location_radius,
-    assigned_employee_ids,
-    verification_method,
-    require_geofence,
-    geofence_radius_meters,
-    status,
-    created_at
-)
-VALUES (
-    'PRJ006',
-    'Makati Security Post – Face Check-in',
-    'Makati CBD security post using face recognition for attendance. Demo account for testing biometric check-in.',
-    14.5567,
-    121.0178,
-    300,
-    ARRAY['EMP029'],
-    'face_only',
-    true,
-    300,
-    'active',
-    '2026-01-15T00:00:00Z'
-)
-ON CONFLICT (id) DO UPDATE SET
-    name                    = EXCLUDED.name,
-    assigned_employee_ids   = EXCLUDED.assigned_employee_ids,
-    verification_method     = EXCLUDED.verification_method,
-    updated_at              = NOW();
-
--- ─── 3. Insert project_assignment join record ─────────────────────────────────
-INSERT INTO public.project_assignments (project_id, employee_id, assigned_at)
-VALUES ('PRJ006', 'EMP029', NOW())
-ON CONFLICT (project_id, employee_id) DO NOTHING;
+-- ─── 2 + 3. Seed: PRJ006 + assignment — moved to 08_tasks_projects_messaging.sql
+-- (projects and project_assignments tables are defined in migration 08)
 
 -- ─── 4. Enable Realtime for face_enrollments if not already enabled ───────────
 -- (idempotent — safe to run multiple times)

@@ -309,7 +309,7 @@ export const useAuthStore = create<AuthState>()(
             },
         }),
         {
-            name: "soren-auth",
+            name: "po-hris-auth",
             version: 8,
             storage: safePersistStorage,
             migrate: (persisted: unknown, version: number) => {

@@ -8,7 +8,7 @@ const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
-    "mailto:admin@nexhrms.com",
+    "mailto:admin@premiumoutlets.local",
     VAPID_PUBLIC_KEY,
     VAPID_PRIVATE_KEY
   );
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
     title,
     body: msgBody,
     url: url || "/notifications",
-    tag: tag || `nexhrms-${Date.now()}`,
+    tag: tag || `po-hris-${Date.now()}`,
     notificationId,
     timestamp: new Date().toISOString(),
   });

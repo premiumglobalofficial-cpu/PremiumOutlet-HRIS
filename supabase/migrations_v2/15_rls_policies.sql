@@ -499,6 +499,18 @@ DROP POLICY IF EXISTS cm_manage ON public.channel_messages;
 CREATE POLICY cm_manage ON public.channel_messages
     FOR ALL USING (public.is_admin_or_hr());
 
+DROP POLICY IF EXISTS cm_update_own ON public.channel_messages;
+CREATE POLICY cm_update_own ON public.channel_messages
+    FOR UPDATE USING (public.is_own_employee(employee_id))
+    WITH CHECK (public.is_own_employee(employee_id));
+
+DROP POLICY IF EXISTS cm_upsert_member ON public.channel_messages;
+CREATE POLICY cm_upsert_member ON public.channel_messages
+    FOR ALL USING (
+        public.is_own_employee(employee_id)
+        OR public.is_admin_or_hr()
+    );
+
 -- ════════════════════════════════════════════════════════════
 -- AUDIT & NOTIFICATIONS (009)
 -- ════════════════════════════════════════════════════════════
@@ -643,6 +655,18 @@ CREATE POLICY br_read_admin ON public.break_records
 DROP POLICY IF EXISTS br_manage ON public.break_records;
 CREATE POLICY br_manage ON public.break_records
     FOR ALL USING (public.is_admin_or_hr());
+
+DROP POLICY IF EXISTS br_insert_own ON public.break_records;
+CREATE POLICY br_insert_own ON public.break_records
+    FOR INSERT WITH CHECK (
+        public.is_own_employee(employee_id) OR public.is_admin_or_hr()
+    );
+
+DROP POLICY IF EXISTS br_update_own ON public.break_records;
+CREATE POLICY br_update_own ON public.break_records
+    FOR UPDATE
+    USING  (public.is_own_employee(employee_id) OR public.is_admin_or_hr())
+    WITH CHECK (public.is_own_employee(employee_id) OR public.is_admin_or_hr());
 
 -- Appearance Config
 DROP POLICY IF EXISTS ac_read ON public.appearance_config;

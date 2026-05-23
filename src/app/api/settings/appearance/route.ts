@@ -78,7 +78,7 @@ export async function PATCH(request: Request) {
 
     const { error } = await admin
       .from("appearance_config")
-      .upsert({ id: "default", company_name: "NexHRMS", module_flags: modules }, { onConflict: "id" });
+      .upsert({ id: "default", company_name: "Premium Outlets", module_flags: modules }, { onConflict: "id" });
 
     if (error) {
       if (error.message?.includes("module_flags")) {

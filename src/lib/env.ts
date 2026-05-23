@@ -71,7 +71,7 @@ export function getFaceTemplateEncryptionKey(): string {
       throw new Error("FACE_TEMPLATE_ENCRYPTION_KEY must be set in production");
     }
     console.warn("[env] FACE_TEMPLATE_ENCRYPTION_KEY not set — using insecure dev default. DO NOT use in production.");
-    return "soren-default-key-change-in-production";
+    return "po-hris-default-key-change-in-production";
   }
   return key;
 }

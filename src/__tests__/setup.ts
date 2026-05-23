@@ -1,5 +1,5 @@
 /**
- * Jest test setup file — NexHRMS
+ * Jest test setup file — Premium Outlets HRIS
  * ================================
  * - Extends Jest with Testing Library matchers
  * - Mocks Supabase clients to prevent hitting real DB in unit tests

@@ -22,7 +22,7 @@ import {
 /**
  * Kiosk Landing Page — Black & Neon Green SaaS Theme
  * 
- * Modern, responsive kiosk interface with Soren Data Solutions branding.
+ * Modern, responsive kiosk interface with Premium Outlets branding.
  * PIN-protected admin access with method selection for employee check-in.
  */
 
@@ -190,7 +190,7 @@ export default function KioskLandingPage() {
                                 <Fingerprint className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: NEON_GREEN }} />
                             </div>
                             <span className="font-bold text-sm sm:text-lg tracking-tight text-white">
-                                {companyName || "SDSI"}
+                                {companyName || "Premium Outlets"}
                             </span>
                         </div>
                     )}
@@ -428,7 +428,7 @@ export default function KioskLandingPage() {
                                 className="h-1.5 w-1.5 rounded-full animate-pulse"
                                 style={{ backgroundColor: NEON_GREEN }}
                             />
-                            <span>{companyName || "Soren Data Solutions Inc."} Attendance Kiosk</span>
+                            <span>{companyName || "Premium Outlets"} Attendance Kiosk</span>
                         </>
                     )}
                 </div>

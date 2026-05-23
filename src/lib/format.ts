@@ -153,7 +153,7 @@ export function formatPhoneDisplay(phone: string | undefined | null): string {
 
 const ALLOWED_EMAIL_PROVIDERS = new Set([
   // Company domain
-  "nexsdsi.com",
+  "premiumoutlets.com.ph",
   // Global providers
   "gmail.com", "googlemail.com",
   "yahoo.com", "yahoo.com.ph", "yahoo.co.uk", "yahoo.co.jp",
@@ -203,8 +203,8 @@ export function validateEmailDomain(email: string): EmailValidationResult {
   }
 
   // Only allow company domain
-  if (domain !== "nexsdsi.com") {
-    return { valid: false, error: "Only @nexsdsi.com email addresses are allowed" };
+  if (domain !== "premiumoutlets.com.ph") {
+    return { valid: false, error: "Only @premiumoutlets.com.ph email addresses are allowed" };
   }
 
   return { valid: true };

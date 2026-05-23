@@ -78,10 +78,10 @@ export default function QRKioskPage() {
     const [errorMessage, setErrorMessage] = useState("QR code not recognized");
     const [deviceId] = useState(() => {
         if (typeof window === "undefined") return "";
-        const stored = localStorage.getItem("sdsi-kiosk-qr-device-id");
+        const stored = localStorage.getItem("po-kiosk-qr-device-id");
         if (stored) return stored;
         const id = `KIOSK-QR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        localStorage.setItem("sdsi-kiosk-qr-device-id", id);
+        localStorage.setItem("po-kiosk-qr-device-id", id);
         return id;
     });
 
@@ -527,7 +527,7 @@ export default function QRKioskPage() {
                         />
                     ) : (
                         <span className="font-semibold text-white/40" style={{ fontSize: "clamp(0.75rem, 1.2vw, 0.875rem)" }}>
-                            {companyName || "SDSI"}
+                            {companyName || "Premium Outlets"}
                         </span>
                     )}
                 </div>
@@ -913,7 +913,7 @@ export default function QRKioskPage() {
                         className="h-1.5 w-1.5 rounded-full animate-pulse"
                         style={{ backgroundColor: NEON_GREEN }}
                     />
-                    <span>{companyName || "Soren Data Solutions Inc."} • QR Code Kiosk</span>
+                    <span>{companyName || "Premium Outlets"} • QR Code Kiosk</span>
                 </div>
             </footer>
         </div>

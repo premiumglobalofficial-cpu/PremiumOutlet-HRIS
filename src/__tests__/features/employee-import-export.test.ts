@@ -1,5 +1,5 @@
-﻿/**
- * Employee Import / Export â€” Backend Tests
+/**
+ * Employee Import / Export — Backend Tests
  * ==========================================
  * Covers:
  *   - POST /api/import/employees  (dryRun + live, validation, duplicates)
@@ -9,7 +9,7 @@
  *   - export-utils: downloadImportTemplate columns
  *
  * Mocks: Supabase server client (see src/__tests__/setup.ts global mock).
- * No real DB calls â€” all assertions on in-memory mock behavior.
+ * No real DB calls — all assertions on in-memory mock behavior.
  */
 
 import { NextResponse } from "next/server";
@@ -20,11 +20,11 @@ import {
   ATTENDANCE_TEMPLATE_HEADERS,
 } from "@/lib/export-utils";
 
-// â”€â”€â”€ Route handlers under test â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Route handlers under test ───────────────────────────────────────────────
 import { POST as importPOST, GET as importGET } from "@/app/api/import/employees/route";
 import { GET as exportGET } from "@/app/api/export/employees/route";
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Build a Request object the way Next.js Route Handlers receive it */
 function makeRequest(
@@ -39,7 +39,7 @@ function makeRequest(
   });
 }
 
-/** Returns a chainable auth result mock: .select().eq().single() â†’ role */
+/** Returns a chainable auth result mock: .select().eq().single() → role */
 function makeAuthChain(role: string) {
   return {
     select: jest.fn().mockReturnValue({
@@ -56,7 +56,7 @@ function makeAuthChain(role: string) {
  * The route calls `from("employees")` in three phases:
  *   1. Auth check:    .select("id, role").eq(...).single()
  *   2. Email lookup:  .select("email")          (directly awaited)
- *   3. Insert (Ã—N):   .insert(record)           (if not dryRun)
+ *   3. Insert (×N):   .insert(record)           (if not dryRun)
  */
 function makeMockForImportPOST(opts: {
   role?: string;
@@ -74,11 +74,11 @@ function makeMockForImportPOST(opts: {
       if (table === "employees") {
         callCount++;
         if (callCount === 1) {
-          // Auth check â€” needs .select().eq().single()
+          // Auth check — needs .select().eq().single()
           return makeAuthChain(role);
         }
         if (callCount === 2) {
-          // Email lookup â€” .select("email") directly awaited
+          // Email lookup — .select("email") directly awaited
           return {
             select: jest.fn().mockResolvedValue({
               data: existingEmails.map((e) => ({ email: e })),
@@ -126,7 +126,7 @@ function makeMockForImportGET(role = "admin") {
  *
  * The route calls `from("employees")` twice:
  *   1. Auth check: .select("role").eq(...).single()
- *   2. Data query: .select("*").order("name").eq?(...)  â€” terminates with await
+ *   2. Data query: .select("*").order("name").eq?(...)  — terminates with await
  */
 function makeMockForExportGET(opts: {
   role?: string;
@@ -147,13 +147,13 @@ function makeMockForExportGET(opts: {
           // Auth check
           return makeAuthChain(role);
         }
-        // Data query â€” .select("*").order().eq?() â†’ all chainable, terminates when awaited
+        // Data query — .select("*").order().eq?() → all chainable, terminates when awaited
         const result = dbError
           ? { data: null, error: { message: dbError } }
           : { data: employees, error: null };
 
         // A thenable object that also supports .eq() chaining
-        // `await queryChain` â†’ calls .then(); `queryChain.eq(...)` â†’ returns Promise
+        // `await queryChain` → calls .then(); `queryChain.eq(...)` → returns Promise
         const queryChain = {
           eq: jest.fn().mockResolvedValue(result),
           then: (
@@ -173,7 +173,7 @@ function makeMockForExportGET(opts: {
   });
 }
 
-/** Unauthorised â€” no user in session */
+/** Unauthorised — no user in session */
 function mockAuthAsAnon() {
   const supabase = createServerSupabaseClient as jest.Mock;
   supabase.mockReturnValueOnce({
@@ -193,11 +193,11 @@ function mockAuthAsEmployee(forExport = false) {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // SECTION 1: Template column definitions (export-utils)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
-describe("export-utils â€” EMPLOYEES_TEMPLATE_HEADERS", () => {
+describe("export-utils — EMPLOYEES_TEMPLATE_HEADERS", () => {
   it("contains exactly 5 personal-info columns", () => {
     expect(EMPLOYEES_TEMPLATE_HEADERS).toHaveLength(5);
   });
@@ -232,11 +232,11 @@ describe("export-utils â€” EMPLOYEES_TEMPLATE_HEADERS", () => {
   });
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // SECTION 2: GET /api/import/employees?template=true
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
-describe("GET /api/import/employees â€” template download", () => {
+describe("GET /api/import/employees — template download", () => {
   it("returns 400 when ?template=true is missing", async () => {
     makeMockForImportGET();
     const req = makeRequest("GET", "http://localhost/api/import/employees");
@@ -278,15 +278,15 @@ describe("GET /api/import/employees â€” template download", () => {
   });
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// SECTION 3: POST /api/import/employees â€” dryRun validation
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 3: POST /api/import/employees — dryRun validation
+// ─────────────────────────────────────────────────────────────────────────────
 
-describe("POST /api/import/employees â€” dryRun validation", () => {
+describe("POST /api/import/employees — dryRun validation", () => {
   it("returns 401 when not authenticated", async () => {
     mockAuthAsAnon();
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "Juan", Email: "juan@nexsdsi.com" }],
+      rows: [{ Name: "Juan", Email: "juan@premiumoutlets.com.ph" }],
       dryRun: true,
     });
     const res = await importPOST(req);
@@ -296,7 +296,7 @@ describe("POST /api/import/employees â€” dryRun validation", () => {
   it("returns 403 for non-admin/hr role", async () => {
     makeMockForImportGET("employee"); // uses same auth-only mock
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "Juan", Email: "juan@nexsdsi.com" }],
+      rows: [{ Name: "Juan", Email: "juan@premiumoutlets.com.ph" }],
       dryRun: true,
     });
     const res = await importPOST(req);
@@ -317,7 +317,7 @@ describe("POST /api/import/employees â€” dryRun validation", () => {
     makeMockForImportPOST();
     const rows = Array.from({ length: 501 }, (_, i) => ({
       Name: `Employee ${i}`,
-      Email: `emp${i}@nexsdsi.com`,
+      Email: `emp${i}@premiumoutlets.com.ph`,
     }));
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
       rows,
@@ -332,7 +332,7 @@ describe("POST /api/import/employees â€” dryRun validation", () => {
   it("marks row as error when Name is missing", async () => {
     makeMockForImportPOST();
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "", Email: "noemail@nexsdsi.com" }],
+      rows: [{ Name: "", Email: "noemail@premiumoutlets.com.ph" }],
       dryRun: true,
     });
     const res = await importPOST(req);
@@ -359,7 +359,7 @@ describe("POST /api/import/employees â€” dryRun validation", () => {
   it("marks row as error when Birthday format is wrong", async () => {
     makeMockForImportPOST();
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "Juan", Email: "juan@nexsdsi.com", Birthday: "05/20/1990" }],
+      rows: [{ Name: "Juan", Email: "juan@premiumoutlets.com.ph", Birthday: "05/20/1990" }],
       dryRun: true,
     });
     const res = await importPOST(req);
@@ -372,7 +372,7 @@ describe("POST /api/import/employees â€” dryRun validation", () => {
   it("accepts Birthday in correct YYYY-MM-DD format", async () => {
     makeMockForImportPOST();
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "Maria", Email: "maria@nexsdsi.com", Birthday: "1993-11-15" }],
+      rows: [{ Name: "Maria", Email: "maria@premiumoutlets.com.ph", Birthday: "1993-11-15" }],
       dryRun: true,
     });
     const res = await importPOST(req);
@@ -385,8 +385,8 @@ describe("POST /api/import/employees â€” dryRun validation", () => {
     makeMockForImportPOST();
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
       rows: [
-        { Name: "Juan A", Email: "same@nexsdsi.com" },
-        { Name: "Juan B", Email: "same@nexsdsi.com" }, // duplicate
+        { Name: "Juan A", Email: "same@premiumoutlets.com.ph" },
+        { Name: "Juan B", Email: "same@premiumoutlets.com.ph" }, // duplicate
       ],
       dryRun: true,
     });
@@ -397,9 +397,9 @@ describe("POST /api/import/employees â€” dryRun validation", () => {
   });
 
   it("detects duplicate email against existing DB records", async () => {
-    makeMockForImportPOST({ existingEmails: ["existing@nexsdsi.com"] });
+    makeMockForImportPOST({ existingEmails: ["existing@premiumoutlets.com.ph"] });
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "Existing Person", Email: "existing@nexsdsi.com" }],
+      rows: [{ Name: "Existing Person", Email: "existing@premiumoutlets.com.ph" }],
       dryRun: true,
     });
     const res = await importPOST(req);
@@ -410,7 +410,7 @@ describe("POST /api/import/employees â€” dryRun validation", () => {
   it("returns dryRun:true and imported:0 in dry run mode", async () => {
     makeMockForImportPOST();
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "New Person", Email: "new@nexsdsi.com" }],
+      rows: [{ Name: "New Person", Email: "new@premiumoutlets.com.ph" }],
       dryRun: true,
     });
     const res = await importPOST(req);
@@ -424,7 +424,7 @@ describe("POST /api/import/employees â€” dryRun validation", () => {
   it("response includes rowValidations array with correct shape", async () => {
     makeMockForImportPOST();
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "Good Row", Email: "good@nexsdsi.com" }],
+      rows: [{ Name: "Good Row", Email: "good@premiumoutlets.com.ph" }],
       dryRun: true,
     });
     const res = await importPOST(req);
@@ -437,15 +437,15 @@ describe("POST /api/import/employees â€” dryRun validation", () => {
   });
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// SECTION 4: POST /api/import/employees â€” live import (dryRun: false)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 4: POST /api/import/employees — live import (dryRun: false)
+// ─────────────────────────────────────────────────────────────────────────────
 
-describe("POST /api/import/employees â€” live insert", () => {
+describe("POST /api/import/employees — live insert", () => {
   it("returns dryRun:false and imported > 0 for valid rows", async () => {
     makeMockForImportPOST();
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "New Hire", Email: "newhire@nexsdsi.com" }],
+      rows: [{ Name: "New Hire", Email: "newhire@premiumoutlets.com.ph" }],
       dryRun: false,
     });
     const res = await importPOST(req);
@@ -458,7 +458,7 @@ describe("POST /api/import/employees â€” live insert", () => {
   it("does NOT import rows with missing Name", async () => {
     makeMockForImportPOST();
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "", Email: "missing-name@nexsdsi.com" }],
+      rows: [{ Name: "", Email: "missing-name@premiumoutlets.com.ph" }],
       dryRun: false,
     });
     const res = await importPOST(req);
@@ -468,9 +468,9 @@ describe("POST /api/import/employees â€” live insert", () => {
   });
 
   it("does NOT import duplicate emails (skips, counts as duplicate)", async () => {
-    makeMockForImportPOST({ existingEmails: ["dup@nexsdsi.com"] });
+    makeMockForImportPOST({ existingEmails: ["dup@premiumoutlets.com.ph"] });
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "Dup Person", Email: "dup@nexsdsi.com" }],
+      rows: [{ Name: "Dup Person", Email: "dup@premiumoutlets.com.ph" }],
       dryRun: false,
     });
     const res = await importPOST(req);
@@ -503,7 +503,7 @@ describe("POST /api/import/employees â€” live insert", () => {
     });
 
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "Auto Default", Email: "defaults@nexsdsi.com" }],
+      rows: [{ Name: "Auto Default", Email: "defaults@premiumoutlets.com.ph" }],
       dryRun: false,
     });
     await importPOST(req);
@@ -518,7 +518,7 @@ describe("POST /api/import/employees â€” live insert", () => {
   it("counts DB insert error as row error (not a 500 crash)", async () => {
     makeMockForImportPOST({ insertError: "unique constraint" });
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
-      rows: [{ Name: "DB Fail", Email: "dbfail@nexsdsi.com" }],
+      rows: [{ Name: "DB Fail", Email: "dbfail@premiumoutlets.com.ph" }],
       dryRun: false,
     });
     const res = await importPOST(req);
@@ -529,9 +529,9 @@ describe("POST /api/import/employees â€” live insert", () => {
   });
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// SECTION 5: GET /api/export/employees â€” XLSX export
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 5: GET /api/export/employees — XLSX export
+// ─────────────────────────────────────────────────────────────────────────────
 
 describe("GET /api/export/employees", () => {
   it("returns 401 when not authenticated", async () => {
@@ -551,7 +551,7 @@ describe("GET /api/export/employees", () => {
   it("returns XLSX file for admin", async () => {
     makeMockForExportGET({
       employees: [
-        { id: "EMP01", name: "Juan Cruz", email: "juan@nexsdsi.com", role: "employee", status: "active" },
+        { id: "EMP01", name: "Juan Cruz", email: "juan@premiumoutlets.com.ph", role: "employee", status: "active" },
       ],
     });
     const req = makeRequest("GET", "http://localhost/api/export/employees");
@@ -584,15 +584,15 @@ describe("GET /api/export/employees", () => {
   });
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// SECTION 6: End-to-end import flow (parse â†’ validate â†’ import round-trip)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 6: End-to-end import flow (parse → validate → import round-trip)
+// ─────────────────────────────────────────────────────────────────────────────
 
-describe("Employee import â€” end-to-end flow simulation", () => {
+describe("Employee import — end-to-end flow simulation", () => {
   /** Simulate the exact data that parseImportFile would return from the template */
   const TEMPLATE_ROWS = [
-    { Name: "Juan Dela Cruz", Email: "juan@nexsdsi.com", Phone: "+63 917 123 4567", Birthday: "1990-05-20", Address: "Manila, Philippines" },
-    { Name: "Maria Santos", Email: "maria@nexsdsi.com", Phone: "+63 918 234 5678", Birthday: "1993-11-15", Address: "Quezon City, Philippines" },
+    { Name: "Juan Dela Cruz", Email: "juan@premiumoutlets.com.ph", Phone: "+63 917 123 4567", Birthday: "1990-05-20", Address: "Manila, Philippines" },
+    { Name: "Maria Santos", Email: "maria@premiumoutlets.com.ph", Phone: "+63 918 234 5678", Birthday: "1993-11-15", Address: "Quezon City, Philippines" },
   ];
 
   it("dry run of template rows produces 2 valid, 0 errors, 0 duplicates", async () => {
@@ -627,7 +627,7 @@ describe("Employee import â€” end-to-end flow simulation", () => {
 
   it("second import of same rows produces 2 duplicates (idempotent)", async () => {
     makeMockForImportPOST({
-      existingEmails: ["juan@nexsdsi.com", "maria@nexsdsi.com"],
+      existingEmails: ["juan@premiumoutlets.com.ph", "maria@premiumoutlets.com.ph"],
     });
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
       rows: TEMPLATE_ROWS,
@@ -641,12 +641,12 @@ describe("Employee import â€” end-to-end flow simulation", () => {
   });
 
   it("mixed batch: 1 valid, 1 error, 1 duplicate", async () => {
-    makeMockForImportPOST({ existingEmails: ["dup@nexsdsi.com"] });
+    makeMockForImportPOST({ existingEmails: ["dup@premiumoutlets.com.ph"] });
     const req = makeRequest("POST", "http://localhost/api/import/employees", {
       rows: [
-        { Name: "Valid Person", Email: "valid@nexsdsi.com" },    // valid
-        { Name: "", Email: "error@nexsdsi.com" },                // error: no name
-        { Name: "Dup Person", Email: "dup@nexsdsi.com" },        // duplicate
+        { Name: "Valid Person", Email: "valid@premiumoutlets.com.ph" },    // valid
+        { Name: "", Email: "error@premiumoutlets.com.ph" },                // error: no name
+        { Name: "Dup Person", Email: "dup@premiumoutlets.com.ph" },        // duplicate
       ],
       dryRun: true,
     });

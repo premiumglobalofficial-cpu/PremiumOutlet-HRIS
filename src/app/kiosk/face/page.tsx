@@ -51,10 +51,10 @@ export default function FaceKioskPage() {
     // Persistent device identifier (same pattern as QR kiosk)
     const [deviceId] = useState(() => {
         if (typeof window === "undefined") return "";
-        const stored = localStorage.getItem("soren-kiosk-face-device-id");
+        const stored = localStorage.getItem("po-hris-kiosk-face-device-id");
         if (stored) return stored;
         const id = `KIOSK-FACE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        localStorage.setItem("soren-kiosk-face-device-id", id);
+        localStorage.setItem("po-hris-kiosk-face-device-id", id);
         return id;
     });
 
@@ -667,7 +667,7 @@ export default function FaceKioskPage() {
                         />
                     ) : (
                         <span className="font-semibold text-white/40" style={{ fontSize: "clamp(0.75rem, 1.2vw, 0.875rem)" }}>
-                            {companyName || "Soren Data Solutions Inc."}
+                            {companyName || "Premium Outlets"}
                         </span>
                     )}
                 </div>
@@ -1143,7 +1143,7 @@ export default function FaceKioskPage() {
                         className="h-1.5 w-1.5 rounded-full animate-pulse"
                         style={{ backgroundColor: NEON_GREEN }}
                     />
-                    <span>{companyName || "Soren Data Solutions Inc."} • Face Recognition Kiosk</span>
+                    <span>{companyName || "Premium Outlets"} • Face Recognition Kiosk</span>
                 </div>
             </footer>
         </div>

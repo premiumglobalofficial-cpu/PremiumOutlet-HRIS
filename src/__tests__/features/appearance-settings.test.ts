@@ -128,7 +128,7 @@ describe("PATCH /api/settings/appearance", () => {
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "default",
-        company_name: "NexHRMS",
+        company_name: "Premium Outlets",
         module_flags: expect.objectContaining({ jobs: true, docs201: false }),
       }),
       { onConflict: "id" }

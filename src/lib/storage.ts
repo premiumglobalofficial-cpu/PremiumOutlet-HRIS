@@ -21,18 +21,18 @@ import { createJSONStorage } from "zustand/middleware";
 // Priority order for eviction (lowest first — evict these first).
 // These are large, fully DB-backed, and will be re-hydrated on next sync.
 const EVICTION_ORDER: string[] = [
-  "soren-audit",         // audit logs — read-only, always re-fetched
-  "soren-location",      // pings/photos — large, transient
-  "soren-timesheet",     // fully DB-backed
-  "soren-messaging",     // channels/messages — DB-backed
-  "soren-attendance",    // events/logs — large, DB-backed
-  "soren-notifications", // logs — DB-backed, capped at 500
-  "soren-payroll",       // payslips/runs — DB-backed
-  "soren-tasks",         // groups/tasks/reports — DB-backed
-  "soren-employees",     // fully DB-backed
-  "nexhrms-deductions",  // deduction templates — DB-backed
-  "hrms-departments",    // departments — DB-backed
-  "hrms-job-titles",     // job titles — DB-backed
+  "po-hris-audit",         // audit logs — read-only, always re-fetched
+  "po-hris-location",      // pings/photos — large, transient
+  "po-hris-timesheet",     // fully DB-backed
+  "po-hris-messaging",     // channels/messages — DB-backed
+  "po-hris-attendance",    // events/logs — large, DB-backed
+  "po-hris-notifications", // logs — DB-backed, capped at 500
+  "po-hris-payroll",       // payslips/runs — DB-backed
+  "po-hris-tasks",         // groups/tasks/reports — DB-backed
+  "po-hris-employees",     // fully DB-backed
+  "po-hris-deductions",    // deduction templates — DB-backed
+  "po-hris-departments",   // departments — DB-backed
+  "po-hris-job-titles",    // job titles — DB-backed
 ];
 
 /**

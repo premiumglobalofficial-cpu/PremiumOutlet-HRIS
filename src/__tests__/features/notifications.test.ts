@@ -1,5 +1,5 @@
 /**
- * NexHRMS — Notification System QA Tests
+ * Premium Outlets HRIS — Notification System QA Tests
  * ========================================
  * Verifies that:
  * 1. Every notification path delivers to the CORRECT recipient(s)

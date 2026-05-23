@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 /**
- * Employees Store Tests — NexHRMS
+ * Employees Store Tests — Premium Outlets HRIS
  * Tests employee CRUD, salary governance, filtering, and document management
  */
 

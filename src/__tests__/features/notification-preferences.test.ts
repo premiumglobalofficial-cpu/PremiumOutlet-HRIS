@@ -1,5 +1,5 @@
 /**
- * NexHRMS — Notification Preferences & DB Persistence QA Tests
+ * Premium Outlets HRIS — Notification Preferences & DB Persistence QA Tests
  * ==============================================================
  * Verifies that:
  *   1. prefKeyForTrigger() maps every trigger to the correct pref key

@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     const response = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "NexHRMS/1.0 (https://nex-hrms.vercel.app; contact@nexhrms.com)",
+        "User-Agent": "PremiumOutletsHRIS/1.0 (Nexvision Innovations Inc.)",
         "Accept": "application/json",
       },
     });

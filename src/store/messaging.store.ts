@@ -30,8 +30,8 @@ const DEFAULT_CONFIG: MessagingConfig = {
     defaultChannel: "email",
     whatsappEnabled: true,
     smsEnabled: false,
-    emailFromName: "Soren Data Solutions",
-    emailFromAddress: "noreply@sdsi.com",
+    emailFromName: "Premium Outlets",
+    emailFromAddress: "noreply@premiumoutlets.local",
 };
 
 interface MessagingState {

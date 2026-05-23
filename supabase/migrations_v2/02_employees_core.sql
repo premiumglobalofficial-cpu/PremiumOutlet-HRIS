@@ -267,16 +267,8 @@ CREATE POLICY "Authenticated users can delete departments"
 -- Index for quick name lookups / auto-complete
 CREATE INDEX IF NOT EXISTS idx_departments_name ON public.departments (lower(name));
 
--- Seed with default departments from the app
-INSERT INTO public.departments (id, name, description, created_by) VALUES
-    ('dept_engineering', 'Engineering', 'Software development and technical teams', 'system'),
-    ('dept_design', 'Design', 'UI/UX and graphic design teams', 'system'),
-    ('dept_marketing', 'Marketing', 'Marketing and brand management', 'system'),
-    ('dept_hr', 'Human Resources', 'HR, recruitment, and employee relations', 'system'),
-    ('dept_finance', 'Finance', 'Accounting, payroll, and financial operations', 'system'),
-    ('dept_sales', 'Sales', 'Sales and business development', 'system'),
-    ('dept_operations', 'Operations', 'Business operations and administration', 'system')
-ON CONFLICT (id) DO NOTHING;
+-- NOTE: Department seed data is provided by 100_po_hris_seed_users.sql
+-- using the canonical DEPT-* ID format referenced by all employee records.
 
 
 -- ----------------------------------------------------------------------------

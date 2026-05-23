@@ -168,9 +168,15 @@ CREATE TABLE IF NOT EXISTS public.projects (
     location_lng            double precision,
     location_radius         double precision,
     assigned_employee_ids   text[] NOT NULL DEFAULT '{}',
+    verification_method     text CHECK (verification_method IN ('face_only','qr_only','face_or_qr','manual_only')) DEFAULT 'face_or_qr',
+    require_geofence        boolean DEFAULT true,
+    geofence_radius_meters  integer DEFAULT 100,
+    qr_secret               text,
+    qr_enabled              boolean NOT NULL DEFAULT true,
     status                  text DEFAULT 'active'
                             CHECK (status IN ('active','completed','on_hold')),
-    created_at              timestamptz NOT NULL DEFAULT now()
+    created_at              timestamptz NOT NULL DEFAULT now(),
+    updated_at              timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
@@ -353,7 +359,7 @@ ALTER TABLE public.break_records ENABLE ROW LEVEL SECURITY;
 -- Appearance Config (singleton — company branding)
 CREATE TABLE IF NOT EXISTS public.appearance_config (
     id                  text PRIMARY KEY DEFAULT 'default',
-    company_name        text NOT NULL DEFAULT 'NexHRMS',
+    company_name        text NOT NULL DEFAULT 'Premium Outlets',
     company_logo        text,
     sidebar_color       text DEFAULT '#1e293b',
     primary_color       text DEFAULT '#3b82f6',
@@ -670,4 +676,39 @@ ALTER TABLE public.tasks ALTER COLUMN group_id DROP NOT NULL;
 
 -- == Add start_date column ===========================================
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS start_date date;
+
+-- ─── Seed: face-only demo project (moved from 04_attendance_and_kiosk.sql) ───
+INSERT INTO public.projects (
+    id, name, description,
+    location_lat, location_lng, location_radius,
+    assigned_employee_ids,
+    verification_method,
+    require_geofence,
+    geofence_radius_meters,
+    status,
+    created_at
+)
+VALUES (
+    'PRJ006',
+    'Makati Security Post – Face Check-in',
+    'Makati CBD security post using face recognition for attendance. Demo account for testing biometric check-in.',
+    14.5567,
+    121.0178,
+    300,
+    ARRAY['EMP029'],
+    'face_only',
+    true,
+    300,
+    'active',
+    '2026-01-15T00:00:00Z'
+)
+ON CONFLICT (id) DO UPDATE SET
+    name                    = EXCLUDED.name,
+    assigned_employee_ids   = EXCLUDED.assigned_employee_ids,
+    verification_method     = EXCLUDED.verification_method,
+    updated_at              = NOW();
+
+INSERT INTO public.project_assignments (project_id, employee_id, assigned_at)
+VALUES ('PRJ006', 'EMP029', NOW())
+ON CONFLICT (project_id, employee_id) DO NOTHING;
 

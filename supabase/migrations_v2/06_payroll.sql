@@ -221,23 +221,8 @@ CREATE POLICY al_read_admin ON public.attendance_logs
     );
 
 -- ─── Channel messages: allow employees to update their own messages ────────
--- This covers read-receipts (readBy field) and message edits by the sender.
--- cm_insert already allows any member to insert; this adds UPDATE for own rows.
-DROP POLICY IF EXISTS cm_update_own ON public.channel_messages;
-CREATE POLICY cm_update_own ON public.channel_messages
-    FOR UPDATE USING (public.is_own_employee(employee_id))
-    WITH CHECK (public.is_own_employee(employee_id));
-
--- Also allow all channel members to upsert their own messages (INSERT+UPDATE)
--- so the write-through sync layer (upsertMessage) doesn't violate RLS.
-DROP POLICY IF EXISTS cm_upsert_member ON public.channel_messages;
-CREATE POLICY cm_upsert_member ON public.channel_messages
-    FOR ALL USING (
-        -- sender can always manage their own messages
-        public.is_own_employee(employee_id)
-        -- admins/hr can manage any message
-        OR public.is_admin_or_hr()
-    );
+-- NOTE: channel_messages is created in 08_tasks_projects_messaging.sql.
+-- These policies have been moved to 15_rls_policies.sql to avoid forward references.
 
 -- ─── Face enrollments: allow employees to self-enroll ─────────────────────
 -- Existing policies fe_insert/fe_update are admin-only; add employee self-service.
@@ -529,11 +514,17 @@ CREATE POLICY payroll_sig_read ON public.payroll_signature_config
 -- ── References to payslips ───────────────────────────────────────────────────
 
 -- 1. loan_deductions.payslip_id  (NOT NULL → CASCADE)
-ALTER TABLE public.loan_deductions
-  DROP CONSTRAINT IF EXISTS fk_ld_payslip,
-  ADD  CONSTRAINT fk_ld_payslip
-       FOREIGN KEY (payslip_id) REFERENCES public.payslips(id)
-       ON DELETE CASCADE;
+-- loan_deductions is created in 07_loans.sql; skip if not yet created.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='loan_deductions') THEN
+    ALTER TABLE public.loan_deductions
+      DROP CONSTRAINT IF EXISTS fk_ld_payslip,
+      ADD  CONSTRAINT fk_ld_payslip
+           FOREIGN KEY (payslip_id) REFERENCES public.payslips(id)
+           ON DELETE CASCADE;
+  END IF;
+END $$;
 
 -- 2. payroll_run_payslips.payslip_id  (NOT NULL junction → CASCADE)
 ALTER TABLE public.payroll_run_payslips
@@ -550,18 +541,30 @@ ALTER TABLE public.payroll_adjustments
        ON DELETE CASCADE;
 
 -- 4. loan_balance_history.payslip_id  (nullable → SET NULL)
-ALTER TABLE public.loan_balance_history
-  DROP CONSTRAINT IF EXISTS fk_lbh_payslip,
-  ADD  CONSTRAINT fk_lbh_payslip
-       FOREIGN KEY (payslip_id) REFERENCES public.payslips(id)
-       ON DELETE SET NULL;
+-- loan_balance_history is created in 07_loans.sql; skip if not yet created.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='loan_balance_history') THEN
+    ALTER TABLE public.loan_balance_history
+      DROP CONSTRAINT IF EXISTS fk_lbh_payslip,
+      ADD  CONSTRAINT fk_lbh_payslip
+           FOREIGN KEY (payslip_id) REFERENCES public.payslips(id)
+           ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- 5. loan_repayment_schedule.payslip_id  (nullable → SET NULL)
-ALTER TABLE public.loan_repayment_schedule
-  DROP CONSTRAINT IF EXISTS fk_lrs_payslip,
-  ADD  CONSTRAINT fk_lrs_payslip
-       FOREIGN KEY (payslip_id) REFERENCES public.payslips(id)
-       ON DELETE SET NULL;
+-- loan_repayment_schedule is created in 07_loans.sql; skip if not yet created.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='loan_repayment_schedule') THEN
+    ALTER TABLE public.loan_repayment_schedule
+      DROP CONSTRAINT IF EXISTS fk_lrs_payslip,
+      ADD  CONSTRAINT fk_lrs_payslip
+           FOREIGN KEY (payslip_id) REFERENCES public.payslips(id)
+           ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- 6. final_pay_computations.payslip_id  (nullable → SET NULL)
 ALTER TABLE public.final_pay_computations

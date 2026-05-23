@@ -1,5 +1,5 @@
 /**
- * Format Utils Tests — NexHRMS
+ * Format Utils Tests — Premium Outlets HRIS
  * Tests currency formatting, date formatting, phone validation, and initials
  */
 

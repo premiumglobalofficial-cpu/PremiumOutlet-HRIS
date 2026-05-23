@@ -170,7 +170,7 @@ export const useOfflineQueueStore = create<OfflineQueueStore>()(
             },
         }),
         {
-            name: "soren-offline-queue",
+            name: "po-hris-offline-queue",
             version: 1,
             storage: safePersistStorage,
         }

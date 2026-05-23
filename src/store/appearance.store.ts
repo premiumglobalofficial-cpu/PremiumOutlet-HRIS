@@ -318,7 +318,7 @@ const INITIAL_STATE = {
   fontFamily: "geist" as FontFamilyId,
   radius: "md" as RadiusId,
   density: "default" as DensityId,
-  companyName: "Soren Data Solutions Inc.",
+  companyName: "Premium Outlets",
   logoUrl: "",
   logoTextVisible: true,
   faviconUrl: "",
@@ -334,7 +334,7 @@ const INITIAL_STATE = {
   loginBackground: "gradient" as LoginBackground,
   loginBgColor: "",
   loginCardStyle: "centered" as LoginCardStyle,
-  loginHeading: "Soren Data Solutions Inc.",
+  loginHeading: "Premium Outlets HRIS",
   loginSubheading: "Sign in to your account to continue",
 };
 
@@ -387,14 +387,24 @@ export const useAppearanceStore = create<AppearanceState>()(
       resetAppearance: () => set(INITIAL_STATE),
     }),
     {
-      name: "soren-appearance",
-      version: 2,
+      name: "po-hris-appearance",
+      version: 3,
       storage: safePersistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
           const oldModules = (state.modules ?? {}) as Record<string, boolean>;
           state.modules = { ...DEFAULT_MODULE_FLAGS, ...oldModules };
+        }
+        if (version < 3) {
+          // Reset any stale SDSI/Soren/NexHRMS branding to Premium Outlets defaults
+          const staleBrands = ["Soren Data Solutions Inc.", "Soren Data Solutions", "SDSI", "NexHRMS"];
+          if (!state.companyName || staleBrands.includes(state.companyName as string)) {
+            state.companyName = "Premium Outlets";
+          }
+          if (!state.loginHeading || staleBrands.some(b => (state.loginHeading as string).includes(b))) {
+            state.loginHeading = "Premium Outlets HRIS";
+          }
         }
         return state as unknown as AppearanceState;
       },

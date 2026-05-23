@@ -474,7 +474,7 @@ export function startRealtime(): void {
 
   const supabase = createClient();
   const channel = supabase
-    .channel("soren-realtime")
+    .channel("po-hris-realtime")
     // ── attendance_logs ──────────────────────────────────────
     .on(
       "postgres_changes",

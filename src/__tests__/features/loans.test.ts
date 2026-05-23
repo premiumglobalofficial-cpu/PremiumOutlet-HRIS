@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 /**
- * Loans Store Tests — NexHRMS
+ * Loans Store Tests — Premium Outlets HRIS
  * Tests loan lifecycle, cap-aware deductions, repayment schedules, and balance tracking
  */
 

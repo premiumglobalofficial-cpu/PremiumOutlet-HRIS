@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 /**
- * Auth & Permissions Tests — NexHRMS
+ * Auth & Permissions Tests — Premium Outlets HRIS
  * Tests role-based access control, permission checking, and admin override
  */
 

@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
   const exampleRow: Record<string, string | number> = {
     "Name": "Juan Dela Cruz",
-    "Email": "juan@nexsdsi.com",
+    "Email": "juan@premiumoutlets.com.ph",
     "Phone": "+63 917 123 4567",
     "Birthday": "1990-05-20",
     "Address": "Manila, Philippines",
@@ -118,8 +118,8 @@ export async function POST(req: Request) {
       rowValidations.push({ row: rowNum, status: "error", message: msg, name });
       continue;
     }
-    if (!email.endsWith("@nexsdsi.com")) {
-      const msg = "Only @nexsdsi.com email addresses are allowed";
+    if (!email.endsWith("@premiumoutlets.com.ph")) {
+      const msg = "Only @premiumoutlets.com.ph email addresses are allowed";
       errors.push(`Row ${rowNum}: ${msg}`);
       rowValidations.push({ row: rowNum, status: "error", message: msg, name, email });
       continue;
