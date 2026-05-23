@@ -3,24 +3,36 @@
 **Powered by Nexvision Innovations Inc.**
 
 This document is the **single source of truth** for setting up the Supabase database for Premium Outlets HRIS.
-All SQL files live under [`supabase/migrations/`](supabase/migrations/) and are intended to be applied **in order** the first time the database is provisioned.
+
+You have **two equivalent options** for provisioning the database:
+
+| Option | Folder | Files | Recommended for |
+|---|---|---|---|
+| ✅ **v2 (recommended)** | [`supabase/migrations_v2/`](supabase/migrations_v2/) | **17 grouped files** | Fresh installs, new tenants, copy-paste setup |
+| Legacy chain | [`supabase/migrations/`](supabase/migrations/) | 61 incremental files | Historical reference, replaying patches |
+
+Both produce **the exact same schema** — v2 just bundles the legacy chain into domain-grouped files for easier copy-paste. **Use v2 for fresh installs.** See [`supabase/migrations_v2/README.md`](supabase/migrations_v2/README.md) for the full v2 manifest and verification queries.
 
 ---
 
-## 1. Quick Setup — Fresh Supabase Project
+## 1. Quick Setup — Fresh Supabase Project (v2, recommended)
 
 1. Create a new Supabase project (region: **Southeast Asia (Singapore)**).
 2. Open the **SQL Editor** in the Supabase dashboard.
-3. For each file in `supabase/migrations/`, in **lexical order** (001 → 061):
+3. For each file in `supabase/migrations_v2/`, in **numeric order** (`01_…` → `16_…`):
    - Open the file in your editor.
    - Copy its contents.
-   - Paste into a new SQL editor query.
-   - Run.
-   - Verify there are no errors before moving to the next file.
+   - Paste into a new SQL editor query and click **Run**.
+   - Verify no errors before moving to the next file.
+4. **Skip `99_seed_data_optional.sql`** in production. For real admin users, run [`scripts/seed-supabase-users.ts`](scripts/seed-supabase-users.ts) instead.
 
-> Tip: The Supabase dashboard lets you keep multiple SQL snippets. Save each migration as a named snippet (e.g. `001_auth_profiles`) so you can re-run them on staging/preview without re-pasting.
+After 16 files (or 17 with seed), your schema, indexes, RLS policies, and storage buckets are ready.
 
-After all 61 files are applied, your schema, indexes, RLS policies, and seed data will be ready.
+---
+
+## 1b. Alternative — Legacy chain (61 files)
+
+If you prefer the original incremental chain (useful when only applying a single new patch), run files in `supabase/migrations/` in lexical order (001 → 061) using the same copy-paste procedure.
 
 ---
 
