@@ -221,34 +221,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (requestCode === 'get_all_userinfo') {
-      if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-        log('warn', 'get_all_userinfo rejected (no supabase config)');
-        res.setHeader('response_code', 'ERROR_NO_SUPABASE');
-        res.statusCode = 500;
-        res.end('ERROR');
-        return;
-      }
-
-      try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/biometric_templates?select=id,biometric_id,name,privilege,face_template,finger_template,employee_id`, {
-          headers: {
-            apikey: SUPABASE_SERVICE_KEY,
-            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-          },
-        });
-        const users = await r.json();
-        res.setHeader('response_code', 'OK');
-        res.setHeader('Content-Type', 'application/json');
-        res.statusCode = 200;
-        res.end(JSON.stringify(users));
-        return;
-      } catch (err) {
-        log('error', 'get_all_userinfo failed', { message: err?.message });
-        res.setHeader('response_code', 'ERROR');
-        res.statusCode = 500;
-        res.end('ERROR');
-        return;
-      }
+      // DISABLED: Auto-sync causes duplicate enrollment errors when multiple
+      // devices try to import the same user IDs. Each device should maintain
+      // its own independent enrollment. Users must be registered manually
+      // on each device they need to use.
+      const deviceId = firstValue(parsed.dev_id, parsed.device_id, parsed.deviceId, parsed.dev, req.headers['dev_id']);
+      log('info', 'get_all_userinfo disabled (prevents cross-device duplicate enrollment)', { devId: deviceId });
+      res.setHeader('response_code', 'OK');
+      res.setHeader('Content-Type', 'application/json');
+      res.statusCode = 200;
+      res.end(JSON.stringify([])); // RETURNS EMPTY ARRAY (no sync, no duplicate!)
+      return;
     }
 
     const isRealtimeLog = requestCode === 'realtime_glog' || Boolean(biometricId);
