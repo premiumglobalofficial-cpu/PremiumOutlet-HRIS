@@ -56,6 +56,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Employee, WorkType, PayFrequency, Role, JobTitle, Department, DeductionType, DeductionOverrideMode } from "@/types";
 import { forceRehydrate } from "@/services/sync.service";
+import * as employeeActions from "@/services/employees-actions.service";
 
 const USE_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
@@ -75,7 +76,7 @@ function SortIndicator({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortK
 }
 
 export default function AdminEmployeesView() {
-    const { employees, searchQuery, setSearchQuery, statusFilter, setStatusFilter, workTypeFilter, setWorkTypeFilter, roleFilter, setRoleFilter, departmentFilter, setDepartmentFilter, toggleStatus, addEmployee, updateEmployee, removeEmployee, resignEmployee, proposeSalaryChange, salaryRequests, approveSalaryChange, rejectSalaryChange } = useEmployeesStore();
+    const { employees, searchQuery, setSearchQuery, statusFilter, setStatusFilter, workTypeFilter, setWorkTypeFilter, roleFilter, setRoleFilter, departmentFilter, setDepartmentFilter, proposeSalaryChange, salaryRequests, approveSalaryChange, rejectSalaryChange } = useEmployeesStore();
     const { currentUser, createAccount } = useAuthStore();
     const demoAccounts = useAuthStore((s) => s.accounts);
     const demoAdminSetPassword = useAuthStore((s) => s.adminSetPassword);
@@ -112,14 +113,9 @@ export default function AdminEmployeesView() {
         if (!canManage) return;
 
         try {
-            const res = await fetch(`/api/employees/${encodeURIComponent(emp.id)}`, {
-                method: "DELETE",
-                credentials: "same-origin",
-            });
-            const data = await res.json().catch(() => ({}));
-
-            if (!res.ok || data.ok === false) {
-                toast.error(data.error || "Failed to delete employee from database");
+            const deleted = await employeeActions.removeEmployee(emp.id);
+            if (!deleted) {
+                toast.error("Failed to delete employee from database");
                 return;
             }
 
@@ -132,7 +128,6 @@ export default function AdminEmployeesView() {
                 }
             }
 
-            removeEmployee(emp.id);
             useAuditStore.getState().log({
                 entityType: "employee",
                 entityId: emp.id,
@@ -532,7 +527,7 @@ export default function AdminEmployeesView() {
             useAuditStore.getState().log({ entityType: "employee", entityId: salaryDialogEmpId, action: "salary_proposed", performedBy: currentUser.id, afterSnapshot: { salary: val } });
             toast.success(`Salary change proposed for ${salaryDialogEmp?.name ?? "employee"} — pending approval`);
         } else {
-            updateEmployee(salaryDialogEmpId, { salary: val });
+            void employeeActions.updateEmployee(salaryDialogEmpId, { salary: val });
             useAuditStore.getState().log({ entityType: "employee", entityId: salaryDialogEmpId, action: "salary_approved", performedBy: currentUser.id, afterSnapshot: { salary: val } });
             toast.success(`Salary updated for ${salaryDialogEmp?.name ?? "employee"}`);
         }
@@ -602,7 +597,7 @@ export default function AdminEmployeesView() {
         // Use validated/formatted phone number
         const formattedPhone = newPhone ? validatePhone(newPhone).formatted : undefined;
         
-        const addResult = addEmployee({
+        const addResult = await employeeActions.addEmployee({
             id, name: newName.trim(), email: newEmail.trim(), role: newSystemRole, jobTitle: newJobTitle, department: newDept, workType: newWorkType,
             salary: salaryVal || 0, joinDate: new Date().toISOString().split("T")[0], productivity: 0,
             status: "active", location: "", phone: formattedPhone, biometricId: newBiometricId.trim() || undefined,
@@ -673,7 +668,7 @@ export default function AdminEmployeesView() {
                 const result = createAccount({ name: newName, email: newEmail, role: newSystemRole, password: newPassword, mustChangePassword: newMustChange, profileComplete: true }, currentUser.email);
                 if (!result.ok) toast.warning(`Employee added but account creation failed: ${result.error}`);
                 else {
-                    if (result.userId) updateEmployee(id, { profileId: result.userId });
+                    if (result.userId) void employeeActions.updateEmployee(id, { profileId: result.userId });
                     toast.success(`${newName} added with a login account.`);
                 }
                 resetForm();
@@ -697,7 +692,7 @@ export default function AdminEmployeesView() {
                 }).then((result) => {
                     if (!result.ok) toast.warning(`Employee added but account creation failed: ${result.error}`);
                     else {
-                        if (result.userId) updateEmployee(id, { profileId: result.userId });
+                        if (result.userId) void employeeActions.updateEmployee(id, { profileId: result.userId });
                         toast.success(`${newName} added with a login account.`);
                         // Refresh accounts list in background
                         refreshAccounts();
@@ -747,7 +742,7 @@ export default function AdminEmployeesView() {
         setEditOpen(true);
     };
 
-    const handleSaveEdit = () => {
+    const handleSaveEdit = async () => {
         if (!canManage || !editingEmp) { toast.error("You don't have permission to edit employees"); return; }
         if (!editName.trim()) { toast.error("Employee name is required"); return; }
         if (!editEmail.trim()) { toast.error("Email address is required"); return; }
@@ -771,7 +766,7 @@ export default function AdminEmployeesView() {
         }
         
         try {
-        updateEmployee(editingEmp.id, {
+        const saveResult = await employeeActions.updateEmployee(editingEmp.id, {
             name: editName.trim(), email: editEmail.trim(), role: editRole, jobTitle: editJobTitle, department: editDept, workType: editWorkType,
             salary: editSalaryNum || 0, phone: formattedPhone, biometricId: editBiometricId.trim() || undefined,
             productivity: Number(editProductivity) || 80, payFrequency: editPayFreq !== "company" ? editPayFreq as PayFrequency : undefined,
@@ -782,6 +777,10 @@ export default function AdminEmployeesView() {
             emergencyContact: editEmergencyContact || undefined,
             address: editAddress || undefined,
         });
+        if (!saveResult.ok) {
+            toast.error(saveResult.error || "Failed to save employee to database");
+            return;
+        }
         // Sync shift assignment to attendance store
         if (editShiftId !== "none") assignShift(editingEmp.id, editShiftId);
         else unassignShift(editingEmp.id);
@@ -1621,7 +1620,7 @@ export default function AdminEmployeesView() {
                                             <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" disabled={!canManage} onClick={() => handleOpenEdit(emp)}>
                                                 <Pencil className="h-3.5 w-3.5" /> Edit
                                             </Button>
-                                            <Button variant={emp.status === "active" ? "destructive" : "default"} size="sm" className="h-8 text-xs" disabled={!canManage} onClick={() => { if (!canManage) return; toggleStatus(emp.id); toast.success(`${emp.name} ${emp.status === "active" ? "deactivated" : "activated"}`); }}>
+                                            <Button variant={emp.status === "active" ? "destructive" : "default"} size="sm" className="h-8 text-xs" disabled={!canManage} onClick={async () => { if (!canManage) return; const ok = await employeeActions.toggleStatus(emp.id); if (ok) toast.success(`${emp.name} ${emp.status === "active" ? "deactivated" : "activated"}`); else toast.error("Failed to update status in database"); }}>
                                                 {emp.status === "active" ? "Deactivate" : "Activate"}
                                             </Button>
                                         </div>
@@ -1681,7 +1680,7 @@ export default function AdminEmployeesView() {
                                                                     else toast.error("No linked account found");
                                                                 }}><KeyRound className="h-3.5 w-3.5" /></Button>
                                                             )}
-                                                            <Button variant="ghost" size="sm" className="h-7 text-[10px]" disabled={!canManage} onClick={() => { if (!canManage) return; toggleStatus(emp.id); useAuditStore.getState().log({ entityType: "employee", entityId: emp.id, action: emp.status === "active" ? "employee_resigned" : "adjustment_applied", performedBy: currentUser.id, reason: emp.status === "active" ? "Deactivated" : "Activated" }); toast.success(`${emp.name} ${emp.status === "active" ? "deactivated" : "activated"}`); }}>
+                                                            <Button variant="ghost" size="sm" className="h-7 text-[10px]" disabled={!canManage} onClick={async () => { if (!canManage) return; const ok = await employeeActions.toggleStatus(emp.id); if (!ok) { toast.error("Failed to update status in database"); return; } useAuditStore.getState().log({ entityType: "employee", entityId: emp.id, action: emp.status === "active" ? "employee_resigned" : "adjustment_applied", performedBy: currentUser.id, reason: emp.status === "active" ? "Deactivated" : "Activated" }); toast.success(`${emp.name} ${emp.status === "active" ? "deactivated" : "activated"}`); }}>
                                                                 {emp.status === "active" ? "Deactivate" : emp.status === "inactive" ? "Activate" : emp.status}
                                                             </Button>
                                                             {canManage && emp.status === "active" && (
@@ -1691,8 +1690,9 @@ export default function AdminEmployeesView() {
                                                                         <AlertDialogHeader><AlertDialogTitle>Resign Employee</AlertDialogTitle><AlertDialogDescription>This will mark <strong>{emp.name}</strong> as resigned and compute their final pay including pro-rated salary, leave conversion, and loan offset.</AlertDialogDescription></AlertDialogHeader>
                                                                         <AlertDialogFooter>
                                                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                            <AlertDialogAction className="bg-orange-600 hover:bg-orange-700" onClick={() => {
-                                                                                resignEmployee(emp.id);
+                                                                            <AlertDialogAction className="bg-orange-600 hover:bg-orange-700" onClick={async () => {
+                                                                                const ok = await employeeActions.resignEmployee(emp.id);
+                                                                                if (!ok) { toast.error("Failed to save resignation to database"); return; }
                                                                                 const loanBalance = getActiveByEmployee(emp.id).reduce((sum, l) => sum + l.remainingBalance, 0);
                                                                                 const balances = getEmployeeBalances(emp.id, new Date().getFullYear());
                                                                                 const leaveDays = balances.reduce((sum, b) => sum + b.remaining, 0);

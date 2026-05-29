@@ -15,6 +15,7 @@ import Image from "next/image";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { DEMO_USERS } from "@/data/seed";
+import { syncDemoSessionCookie } from "@/services/demo-session.client";
 
 // Set to true to use local demo login (no Supabase required)
 const USE_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
@@ -128,9 +129,14 @@ export default function LoginPage() {
         }
         const success = localLogin(loginEmail, loginPassword);
         if (success) {
+            const user = useAuthStore.getState().currentUser;
+            void syncDemoSessionCookie({
+                id: user.id,
+                role: user.role,
+                email: user.email,
+            });
             toast.success("Welcome back!");
-            const role = useAuthStore.getState().currentUser.role;
-            router.push(`/${role}/dashboard`);
+            router.push(`/${user.role}/dashboard`);
         } else {
             toast.error("Invalid email or password");
         }
@@ -230,13 +236,15 @@ export default function LoginPage() {
                     </div>
 
                     {/* Login Form */}
-                    <form onSubmit={handleLogin} className="space-y-5">
+                    <form onSubmit={handleLogin} className="space-y-5" data-testid="login-form">
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium leading-none">
+                                <label className="text-sm font-medium leading-none" htmlFor="login-email">
                                     Email address
                                 </label>
                                 <Input
+                                    id="login-email"
+                                    data-testid="login-email"
                                     type="email"
                                     placeholder="name@company.com"
                                     value={email}
@@ -247,9 +255,11 @@ export default function LoginPage() {
                             </div>
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <label className="text-sm font-medium leading-none">Password</label>
+                                    <label className="text-sm font-medium leading-none" htmlFor="login-password">Password</label>
                                 </div>
                                 <Input
+                                    id="login-password"
+                                    data-testid="login-password"
                                     type="password"
                                     placeholder="••••••••"
                                     value={password}
@@ -260,7 +270,7 @@ export default function LoginPage() {
                             </div>
                         </div>
                         
-                        <Button type="submit" size="lg" className="w-full h-12 text-base font-semibold shadow-md active:scale-[0.99] transition-all" disabled={loading}>
+                        <Button type="submit" data-testid="login-submit" size="lg" className="w-full h-12 text-base font-semibold shadow-md active:scale-[0.99] transition-all" disabled={loading}>
                             {loading ? "Signing in..." : "Sign in"}
                         </Button>
                     </form>
@@ -281,6 +291,7 @@ export default function LoginPage() {
                                 <button
                                     key={acc.email}
                                     type="button"
+                                    data-testid={`demo-login-${acc.role}`}
                                     className="flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-muted/20 hover:bg-muted/60 hover:border-border/80 transition-all text-left group"
                                     disabled={loading}
                                     onClick={() => handleQuickLogin(acc.email)}

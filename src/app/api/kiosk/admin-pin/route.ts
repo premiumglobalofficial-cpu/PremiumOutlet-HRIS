@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/services/supabase-server";
 import crypto from "crypto";
+import { getApiAuthContext } from "@/lib/api-auth";
 
 const ADMIN_KIOSK_DEVICE_ID = "ADMIN_KIOSK_CONFIG";
 
@@ -20,25 +20,12 @@ export async function GET() {
  * POST /api/kiosk/admin-pin
  * Body: { pin: string }
  * Save a new admin PIN (hashed) to kiosk_pins table.
- * Requires admin authentication.
+ * Requires admin authentication (Supabase session or demo mode).
  */
 export async function POST(req: Request) {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const ctx = await getApiAuthContext({ requireAdmin: true });
+    if (!ctx) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify caller is an admin
-    const { data: emp } = await supabase
-        .from("employees")
-        .select("role")
-        .eq("profile_id", user.id)
-        .single();
-
-    if (emp?.role !== "admin") {
-        return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
     const body = await req.json() as { pin?: unknown };
@@ -49,16 +36,16 @@ export async function POST(req: Request) {
     }
 
     const pinHash = hashPin(pin);
+    const db = ctx.adminDb;
 
-    // Check if an admin PIN record already exists (upsert)
-    const { data: existing } = await supabase
+    const { data: existing } = await db
         .from("kiosk_pins")
         .select("id")
         .eq("kiosk_device_id", ADMIN_KIOSK_DEVICE_ID)
         .maybeSingle();
 
     if (existing) {
-        const { error } = await supabase
+        const { error } = await db
             .from("kiosk_pins")
             .update({
                 pin_hash: pinHash,
@@ -69,17 +56,17 @@ export async function POST(req: Request) {
 
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     } else {
-        const { error } = await supabase
+        const { error } = await db
             .from("kiosk_pins")
             .insert({
                 kiosk_device_id: ADMIN_KIOSK_DEVICE_ID,
                 pin_hash: pinHash,
-                created_by: user.id,
+                created_by: ctx.userId,
                 is_active: true,
             });
 
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, demoMode: ctx.demoMode });
 }

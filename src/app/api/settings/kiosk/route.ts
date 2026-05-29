@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/services/supabase-server";
+import { getApiAuthContext } from "@/lib/api-auth";
 
 // ─── camelCase → snake_case mapping ──────────────────────────────────────────
 function toDbRow(config: Record<string, unknown>) {
@@ -101,11 +101,12 @@ function fromDbRow(row: Record<string, unknown>) {
 
 // ─── GET /api/settings/kiosk — Fetch kiosk config ───────────────────────────
 export async function GET() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ctx = await getApiAuthContext({ requireAdmin: true });
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
+  const db = ctx.demoMode ? ctx.adminDb : ctx.supabase;
+
+  const { data, error } = await db
     .from("kiosk_config")
     .select("*")
     .eq("id", "default")
@@ -124,19 +125,8 @@ export async function GET() {
 
 // ─── PATCH /api/settings/kiosk — Update kiosk config ────────────────────────
 export async function PATCH(req: Request) {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  // Only admin can change kiosk settings
-  const { data: emp } = await supabase
-    .from("employees")
-    .select("role")
-    .eq("profile_id", user.id)
-    .single();
-  if (!emp || emp.role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const ctx = await getApiAuthContext({ requireAdmin: true });
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   if (!body || typeof body !== "object") {
@@ -150,7 +140,9 @@ export async function PATCH(req: Request) {
 
   dbRow.updated_at = new Date().toISOString();
 
-  const { data, error } = await supabase
+  const db = ctx.demoMode ? ctx.adminDb : ctx.supabase;
+
+  const { data, error } = await db
     .from("kiosk_config")
     .upsert({ id: "default", ...dbRow })
     .select()

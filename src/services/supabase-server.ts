@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { getSupabaseUrl, getSupabaseAnonKey, getServiceRoleKey } from "@/lib/env";
+import { getSupabaseUrl, getSupabaseAnonKey } from "@/lib/env";
+
+export { createAdminSupabaseClient } from "@/lib/supabase-admin";
+export { adminDbErrorHint, isDbPermissionDenied } from "@/lib/supabase-admin";
 
 /**
  * Check if an error is a refresh token error.
@@ -57,42 +59,16 @@ export async function createServerSupabaseClient() {
   const originalGetUser = client.auth.getUser.bind(client.auth);
   client.auth.getUser = async (jwt?: string) => {
     const result = await originalGetUser(jwt);
-    // If we have a user, or a JWT was explicitly provided, return as-is.
     if (result.data.user || jwt) return result;
 
-    // getUser() returned null without an explicit JWT — access token is likely
-    // expired. Attempt a session refresh using the refresh token from cookies.
-    console.debug("[supabase-server] getUser() returned null — attempting refreshSession()");
+    const hasAuthCookies = cookieStore.getAll().some((c) => c.name.startsWith("sb-"));
+    if (!hasAuthCookies) return result;
+
     const { data: { session }, error: refreshError } = await client.auth.refreshSession();
-    if (refreshError) {
-      console.debug("[supabase-server] refreshSession() failed:", refreshError.message);
-      return result; // Return original null result
-    }
-    if (session?.user) {
-      console.debug("[supabase-server] refreshSession() succeeded — session restored");
-      return { data: { user: session.user }, error: null };
-    }
-    return result;
+    if (refreshError || !session?.user) return result;
+
+    return { data: { user: session.user }, error: null };
   };
 
   return client;
-}
-
-/**
- * Admin client using service_role key — use ONLY in server actions / API routes.
- * Uses createClient (NOT createServerClient) so the service role key is used
- * directly as the auth token.  createServerClient piggybacks on cookie-based
- * sessions, which means the user's JWT takes precedence and RLS still applies.
- */
-export async function createAdminSupabaseClient() {
-  return createClient(
-    getSupabaseUrl(),
-    getServiceRoleKey(),
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    }
-  );
 }

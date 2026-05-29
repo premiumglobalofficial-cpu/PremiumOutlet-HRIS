@@ -15,8 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { KeyRound, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { syncDemoSessionCookie } from "@/services/demo-session.client";
 
-const USE_DEMO_MODE = process.env.NEXT_PUBLIC_USE_DEMO_MODE === "true";
+const USE_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
 function AppLoadingScreen() {
     return (
@@ -186,7 +187,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!mounted) return;
-        if (!isAuthenticated && pathname !== "/login" && pathname !== "/deactivated") {
+        const isKioskPath = pathname === "/kiosk" || pathname.startsWith("/kiosk/");
+        if (!isAuthenticated && pathname !== "/login" && pathname !== "/deactivated" && !isKioskPath) {
             // Hard navigation so the middleware re-evaluates cookies cleanly
             window.location.href = "/login";
         }
@@ -212,10 +214,19 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         }
     }, [isAuthenticated, mounted, employees, currentUser, pathname]);
 
-    // Sync stores with Supabase when authenticated (handles page refresh).
-    // Also listens for Supabase auth events to handle invalid/expired tokens.
+    // Demo mode: keep httpOnly demo session cookie in sync with Zustand (page refresh).
     useEffect(() => {
-        if (!mounted || !isAuthenticated) return;
+        if (!mounted || !isAuthenticated || !USE_DEMO_MODE || !currentUser) return;
+        void syncDemoSessionCookie({
+            id: currentUser.id,
+            role: currentUser.role,
+            email: currentUser.email,
+        });
+    }, [mounted, isAuthenticated, currentUser?.id, currentUser?.role, currentUser?.email]);
+
+    // Sync stores with Supabase when authenticated (handles page refresh).
+    useEffect(() => {
+        if (!mounted || !isAuthenticated || USE_DEMO_MODE) return;
 
         const supabase = createClient();
 
@@ -271,7 +282,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     if (!mounted) return <AppLoadingScreen />;
 
     // Show spinner while the unauthenticated redirect is in-flight
-    if (!isAuthenticated && !isLoginPage && !isDeactivated) return <AppLoadingScreen />;
+    if (!isAuthenticated && !isLoginPage && !isDeactivated && !isKiosk) return <AppLoadingScreen />;
 
     return (
         <TooltipProvider>

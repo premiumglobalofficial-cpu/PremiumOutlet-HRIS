@@ -101,6 +101,16 @@ export function getT800Only(): boolean {
   return process.env.T800_ONLY === "true";
 }
 
+/** HMAC secret for QR tokens and signed demo sessions — server-side only. */
+export function getQrHmacSecret(): string {
+  const secret = process.env.QR_HMAC_SECRET;
+  if (secret && secret.length >= 16) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("QR_HMAC_SECRET must be set in production (≥16 chars)");
+  }
+  return "po-hris-qr-attendance-2025";
+}
+
 // ─── Kiosk Security ───────────────────────────────────────────────────────────
 
 /** Kiosk device API key — server-side only. Optional in dev, required in production. */

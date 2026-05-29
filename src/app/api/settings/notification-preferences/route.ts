@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/services/supabase-server";
+import { getApiAuthContext } from "@/lib/api-auth";
 
 const VALID_PREF_KEYS = ["leaveUpdates", "absenceAlerts", "payrollAlerts", "pushEnabled"] as const;
 
@@ -9,20 +9,19 @@ const VALID_PREF_KEYS = ["leaveUpdates", "absenceAlerts", "payrollAlerts", "push
  */
 export async function GET() {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const ctx = await getApiAuthContext();
+    if (!ctx?.userId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { data, error } = await supabase
+    const db = ctx.demoMode ? ctx.adminDb : ctx.supabase;
+    const { data, error } = await db
       .from("employees")
       .select("id, notification_preferences")
-      .eq("profile_id", user.id)
+      .eq("profile_id", ctx.userId)
       .single();
 
     if (error) {
-      // Column may not exist yet (pre-migration) — return defaults
       if (error.message?.includes("notification_preferences")) {
         return NextResponse.json({ employeeId: null, preferences: {} });
       }
@@ -42,13 +41,11 @@ export async function GET() {
 /**
  * PATCH /api/settings/notification-preferences
  * Updates the current employee's notification preferences.
- * Body: { employeeId: string, preferences: { leaveUpdates?: boolean, ... } }
  */
 export async function PATCH(request: Request) {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const ctx = await getApiAuthContext();
+    if (!ctx?.userId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
@@ -59,7 +56,6 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "preferences object required" }, { status: 400 });
     }
 
-    // Validate preference keys — only allow known boolean keys
     const safePatch: Record<string, boolean> = {};
     for (const key of VALID_PREF_KEYS) {
       if (key in preferences && typeof preferences[key] === "boolean") {
@@ -67,8 +63,9 @@ export async function PATCH(request: Request) {
       }
     }
 
-    // Verify the employee belongs to the current user (ownership check)
-    const { data: emp, error: empError } = await supabase
+    const db = ctx.demoMode ? ctx.adminDb : ctx.supabase;
+
+    const { data: emp, error: empError } = await db
       .from("employees")
       .select("id, profile_id")
       .eq("id", employeeId)
@@ -78,18 +75,16 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     }
 
-    if (emp.profile_id !== user.id) {
+    if (emp.profile_id !== ctx.userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Update notification_preferences jsonb column
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from("employees")
       .update({ notification_preferences: safePatch })
       .eq("id", employeeId);
 
     if (updateError) {
-      // Column may not exist yet — graceful degradation
       if (updateError.message?.includes("notification_preferences")) {
         return NextResponse.json({ ok: true, note: "Column not yet migrated" });
       }

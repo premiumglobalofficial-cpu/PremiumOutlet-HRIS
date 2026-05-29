@@ -190,7 +190,7 @@ export const useNotificationsStore = create<NotificationsState>()(
 
             fetchFromDb: async () => {
                 try {
-                    const res = await fetch("/api/settings/notifications");
+                    const res = await fetch("/api/settings/notifications", { credentials: "include" });
                     if (!res.ok) return;
                     const data = await res.json();
                     if (data && typeof data === "object") {
@@ -314,6 +314,7 @@ export const useNotificationsStore = create<NotificationsState>()(
                 if (updated) {
                     void fetch("/api/settings/notifications", {
                         method: "PATCH",
+                        credentials: "include",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ rule: updated }),
                     }).catch(() => {});
@@ -328,6 +329,7 @@ export const useNotificationsStore = create<NotificationsState>()(
                 if (updated) {
                     void fetch("/api/settings/notifications", {
                         method: "PATCH",
+                        credentials: "include",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ rule: updated }),
                     }).catch(() => {});
@@ -340,6 +342,7 @@ export const useNotificationsStore = create<NotificationsState>()(
                 set({ rules: [...DEFAULT_RULES] });
                 void fetch("/api/settings/notifications", {
                     method: "PATCH",
+                    credentials: "include",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ rules: DEFAULT_RULES }),
                 }).catch(() => {});
@@ -350,6 +353,7 @@ export const useNotificationsStore = create<NotificationsState>()(
                 set((s) => ({ providerConfig: { ...s.providerConfig, ...patch } }));
                 void fetch("/api/settings/notifications", {
                     method: "PATCH",
+                    credentials: "include",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ providerConfig: { ...get().providerConfig, ...patch } }),
                 }).catch(() => {});
@@ -552,11 +556,13 @@ export const useNotificationsStore = create<NotificationsState>()(
                 // Sync defaults back to DB
                 void fetch("/api/settings/notifications", {
                     method: "PATCH",
+                    credentials: "include",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ rules: DEFAULT_RULES }),
                 }).catch(() => {});
                 void fetch("/api/settings/notifications", {
                     method: "PATCH",
+                    credentials: "include",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ providerConfig: DEFAULT_PROVIDER }),
                 }).catch(() => {});

@@ -93,6 +93,9 @@ export async function safeGetSession(client: SupabaseClient): Promise<Session | 
  * Handles auth errors silently and clears stale auth data.
  */
 async function initializeClient(client: SupabaseClient): Promise<void> {
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+  if (isDemoMode) return;
+
   const session = await safeGetSession(client);
   
   if (!session) {

@@ -37,6 +37,11 @@ jest.mock("sonner", () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
 }));
 
+jest.mock("@/lib/api-auth", () => ({
+  ...jest.requireActual("@/lib/api-auth"),
+  getApiAuthContext: jest.fn(),
+}));
+
 let nanoidSeq = 0;
 
 // ─── Imports ──────────────────────────────────────────────────
@@ -57,7 +62,27 @@ import {
   notifyAbsence,
 } from "@/lib/notifications";
 
+import { getApiAuthContext } from "@/lib/api-auth";
+
 // ─── Helpers ──────────────────────────────────────────────────
+
+function mockNotifApiAuth(
+  userId: string | null,
+  supabase?: { from: jest.Mock },
+) {
+  if (!userId) {
+    (getApiAuthContext as jest.Mock).mockResolvedValueOnce(null);
+    return;
+  }
+  const client = supabase ?? { from: jest.fn() };
+  (getApiAuthContext as jest.Mock).mockResolvedValueOnce({
+    userId,
+    role: "employee",
+    supabase: client,
+    adminDb: client,
+    demoMode: false,
+  });
+}
 
 function resetStore() {
   useNotificationsStore.getState().resetToSeed();
@@ -667,20 +692,8 @@ describe("setEmployeePref / getEmployeePref — Store State Management", () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe("GET /api/settings/notification-preferences — Supabase Integration", () => {
-  let createServerSupabaseClient: jest.Mock;
-
-  beforeEach(() => {
-    jest.resetModules();
-    const serverMod = jest.requireMock("@/services/supabase-server");
-    createServerSupabaseClient = serverMod.createServerSupabaseClient;
-  });
-
   it("should return 401 when user is not authenticated", async () => {
-    // Arrange: mock no user
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: { message: "Not authenticated" } }) },
-      from: jest.fn(),
-    });
+    mockNotifApiAuth(null);
 
     const { GET } = await import("@/app/api/settings/notification-preferences/route");
     const res = await GET();
@@ -691,12 +704,9 @@ describe("GET /api/settings/notification-preferences — Supabase Integration", 
   });
 
   it("should return employee preferences when authenticated", async () => {
-    // Arrange: mock authenticated user + employee with prefs
-    const mockUser = { id: "uuid-bob" };
     const mockPrefs = { leaveUpdates: false, absenceAlerts: true, payrollAlerts: true, pushEnabled: false };
 
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: mockUser }, error: null }) },
+    mockNotifApiAuth("uuid-bob", {
       from: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
@@ -719,9 +729,7 @@ describe("GET /api/settings/notification-preferences — Supabase Integration", 
   });
 
   it("should return empty prefs when column doesn't exist (pre-migration)", async () => {
-    const mockUser = { id: "uuid-bob" };
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: mockUser }, error: null }) },
+    mockNotifApiAuth("uuid-bob", {
       from: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
@@ -749,19 +757,8 @@ describe("GET /api/settings/notification-preferences — Supabase Integration", 
 // ═══════════════════════════════════════════════════════════════
 
 describe("PATCH /api/settings/notification-preferences — Supabase Integration", () => {
-  let createServerSupabaseClient: jest.Mock;
-
-  beforeEach(() => {
-    jest.resetModules();
-    const serverMod = jest.requireMock("@/services/supabase-server");
-    createServerSupabaseClient = serverMod.createServerSupabaseClient;
-  });
-
   it("should return 401 when user is not authenticated", async () => {
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: { message: "No session" } }) },
-      from: jest.fn(),
-    });
+    mockNotifApiAuth(null);
 
     const { PATCH } = await import("@/app/api/settings/notification-preferences/route");
     const req = new Request("http://localhost/api/settings/notification-preferences", {
@@ -774,11 +771,7 @@ describe("PATCH /api/settings/notification-preferences — Supabase Integration"
   });
 
   it("should return 400 when preferences is missing or invalid", async () => {
-    const mockUser = { id: "uuid-bob" };
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: mockUser }, error: null }) },
-      from: jest.fn(),
-    });
+    mockNotifApiAuth("uuid-bob", { from: jest.fn() });
 
     const { PATCH } = await import("@/app/api/settings/notification-preferences/route");
     const req = new Request("http://localhost/api/settings/notification-preferences", {
@@ -793,16 +786,14 @@ describe("PATCH /api/settings/notification-preferences — Supabase Integration"
   });
 
   it("should return 403 when employee does not belong to user (ownership check)", async () => {
-    const mockUser = { id: "uuid-attacker" }; // NOT uuid-bob
     const mockSelectReturn = {
       single: jest.fn().mockResolvedValue({
-        data: { id: "EMP-002", profile_id: "uuid-bob" }, // belongs to Bob, not attacker
+        data: { id: "EMP-002", profile_id: "uuid-bob" },
         error: null,
       }),
     };
 
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: mockUser }, error: null }) },
+    mockNotifApiAuth("uuid-attacker", {
       from: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue(mockSelectReturn),
@@ -826,9 +817,7 @@ describe("PATCH /api/settings/notification-preferences — Supabase Integration"
   });
 
   it("should return 404 when employee ID doesn't exist", async () => {
-    const mockUser = { id: "uuid-bob" };
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: mockUser }, error: null }) },
+    mockNotifApiAuth("uuid-bob", {
       from: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
@@ -849,13 +838,11 @@ describe("PATCH /api/settings/notification-preferences — Supabase Integration"
   });
 
   it("should sanitize preferences — only accept known boolean keys", async () => {
-    const mockUser = { id: "uuid-bob" };
     const mockUpdate = jest.fn().mockReturnValue({
       eq: jest.fn().mockResolvedValue({ error: null }),
     });
 
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: mockUser }, error: null }) },
+    mockNotifApiAuth("uuid-bob", {
       from: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
@@ -902,13 +889,11 @@ describe("PATCH /api/settings/notification-preferences — Supabase Integration"
   });
 
   it("should successfully update prefs for own employee record", async () => {
-    const mockUser = { id: "uuid-bob" };
     const mockUpdate = jest.fn().mockReturnValue({
       eq: jest.fn().mockResolvedValue({ error: null }),
     });
 
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: mockUser }, error: null }) },
+    mockNotifApiAuth("uuid-bob", {
       from: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
@@ -952,9 +937,7 @@ describe("PATCH /api/settings/notification-preferences — Supabase Integration"
   });
 
   it("should gracefully handle pre-migration column missing on update", async () => {
-    const mockUser = { id: "uuid-bob" };
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: mockUser }, error: null }) },
+    mockNotifApiAuth("uuid-bob", {
       from: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
