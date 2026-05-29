@@ -1,5 +1,6 @@
 "use server";
 
+import { getApiAuthContext } from "@/lib/api-auth";
 import { createAdminSupabaseClient, createServerSupabaseClient } from "./supabase-server";
 import type { Role } from "@/types";
 
@@ -117,22 +118,13 @@ export async function createUserAccount(input: {
     return { ok: false as const, error: "Password must be at least 8 characters" };
   }
 
-  // Verify the caller is an authenticated admin
-  const caller = await createServerSupabaseClient();
-  const { data: { user: callerUser } } = await caller.auth.getUser();
-  if (!callerUser) return { ok: false as const, error: "Not authenticated" };
-
-  const { data: callerProfile } = await caller
-    .from("profiles")
-    .select("role")
-    .eq("id", callerUser.id)
-    .single();
-
-  if (callerProfile?.role !== "admin") {
-    return { ok: false as const, error: "Only admins can create accounts" };
+  const ctx = await getApiAuthContext({ requireAdmin: true });
+  if (!ctx) return { ok: false as const, error: "Not authenticated" };
+  if (ctx.demoMode) {
+    return { ok: false as const, error: "Account creation requires Supabase auth (not demo cookie login)" };
   }
 
-  const supabase = await createAdminSupabaseClient();
+  const supabase = ctx.adminDb;
 
   // Create auth user
   const { data, error } = await supabase.auth.admin.createUser({

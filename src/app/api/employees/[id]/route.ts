@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/services/supabase-server";
+import { getApiAuthContext } from "@/lib/api-auth";
+import { employeeToDb } from "@/lib/employee-db";
+import { hasPermissionServer } from "@/lib/permissions-server";
+import { createAdminSupabaseClient } from "@/services/supabase-server";
+import type { Employee } from "@/types";
 
 export const runtime = "nodejs";
 
@@ -32,6 +36,38 @@ async function deleteIn(
   }
 }
 
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    if (!id) {
+      return NextResponse.json({ ok: false, error: "Missing employee id" }, { status: 400 });
+    }
+
+    const ctx = await getApiAuthContext();
+    if (!ctx) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (!hasPermissionServer(ctx.role, "employees:edit")) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    }
+
+    const patch = (await request.json()) as Partial<Employee>;
+    const row = employeeToDb({ ...patch, updatedAt: new Date().toISOString() });
+    delete row.id;
+
+    const { error } = await ctx.adminDb.from("employees").update(row).eq("id", id);
+    if (error) {
+      console.error("[employees] PATCH:", error.message);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, id });
+  } catch (err) {
+    console.error("[employees] PATCH error:", err);
+    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
+  }
+}
+
 export async function DELETE(_request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
@@ -39,32 +75,29 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ ok: false, error: "Missing employee id" }, { status: 400 });
     }
 
-    const serverSupabase = await createServerSupabaseClient();
-    const { data: { user }, error: authError } = await serverSupabase.auth.getUser();
-    if (authError || !user) {
+    const ctx = await getApiAuthContext();
+    if (!ctx) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
-
-    const admin = await createAdminSupabaseClient();
-    const { data: actor, error: actorError } = await admin
-      .from("employees")
-      .select("id, role")
-      .or(`profile_id.eq.${user.id},email.eq.${user.email ?? ""}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (actorError) {
-      console.error("[employees/delete] actor lookup:", actorError.message);
-      return NextResponse.json({ ok: false, error: "Actor lookup failed" }, { status: 500 });
-    }
-
-    const actorRole = String(actor?.role || "").toLowerCase();
-    if (!["admin", "hr"].includes(actorRole)) {
+    if (!hasPermissionServer(ctx.role, "employees:delete")) {
       return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
-    if (actor?.id === id) {
-      return NextResponse.json({ ok: false, error: "You cannot delete your own employee record" }, { status: 400 });
+    const admin = await createAdminSupabaseClient();
+
+    if (ctx.userId) {
+      const { data: actor } = await admin
+        .from("employees")
+        .select("id")
+        .or(`profile_id.eq.${ctx.userId},id.eq.${ctx.userId}`)
+        .limit(1)
+        .maybeSingle();
+      if (actor?.id === id) {
+        return NextResponse.json(
+          { ok: false, error: "You cannot delete your own employee record" },
+          { status: 400 },
+        );
+      }
     }
 
     const { data: employee, error: employeeError } = await admin

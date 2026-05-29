@@ -14,7 +14,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/services/supabase-server";
+import { getApiAuthContext } from "@/lib/api-auth";
 import { hasPermissionServer } from "@/lib/permissions-server";
 
 interface ReconcileResult {
@@ -26,26 +26,15 @@ interface ReconcileResult {
 }
 
 export async function POST(req: Request) {
-  const supabase = await createServerSupabaseClient();
-
-  // Auth check
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const ctx = await getApiAuthContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  // Role check — only admin/hr may trigger bulk absence reconciliation
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  const userRole = profile?.role as string | undefined;
-  if (!hasPermissionServer(userRole ?? "", "attendance:edit")) {
+  if (!hasPermissionServer(ctx.role, "attendance:edit")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const db = ctx.adminDb;
 
   // Parse body
   let startDate: string;
@@ -68,7 +57,7 @@ export async function POST(req: Request) {
   }
 
   // 1. Get all active employees with their work_days
-  const { data: employees, error: empErr } = await supabase
+  const { data: employees, error: empErr } = await db
     .from("employees")
     .select("id, name, work_days, join_date, status")
     .eq("status", "active");
@@ -90,7 +79,7 @@ export async function POST(req: Request) {
   }
 
   // 2. Get all holidays in the date range
-  const { data: holidays } = await supabase
+  const { data: holidays } = await db
     .from("holidays")
     .select("date")
     .gte("date", startDate)
@@ -99,7 +88,7 @@ export async function POST(req: Request) {
   const holidaySet = new Set((holidays || []).map((h) => h.date));
 
   // 3. Get all existing attendance logs in the date range
-  const { data: existingLogs } = await supabase
+  const { data: existingLogs } = await db
     .from("attendance_logs")
     .select("employee_id, date")
     .gte("date", startDate)
@@ -111,7 +100,7 @@ export async function POST(req: Request) {
   );
 
   // 4. Get all attendance events (check-ins) in the date range
-  const { data: events } = await supabase
+  const { data: events } = await db
     .from("attendance_events")
     .select("employee_id, timestamp_utc")
     .eq("event_type", "IN")
@@ -127,7 +116,7 @@ export async function POST(req: Request) {
   );
 
   // 5. Get all leave requests (approved) in the date range
-  const { data: leaveRequests } = await supabase
+  const { data: leaveRequests } = await db
     .from("leave_requests")
     .select("employee_id, start_date, end_date")
     .eq("status", "approved")
@@ -249,7 +238,7 @@ export async function POST(req: Request) {
 
   // 8. Batch insert (upsert to handle any edge cases)
   if (toInsert.length > 0) {
-    const { error: insertErr } = await supabase
+    const { error: insertErr } = await db
       .from("attendance_logs")
       .upsert(toInsert, { onConflict: "id", ignoreDuplicates: true });
 

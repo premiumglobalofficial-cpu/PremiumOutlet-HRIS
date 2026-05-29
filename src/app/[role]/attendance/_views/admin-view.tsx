@@ -308,6 +308,7 @@ export default function AdminView({ mode = "admin" }: AdminViewProps) {
         try {
             const res = await fetch("/api/attendance/reconcile-absences", {
                 method: "POST",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],

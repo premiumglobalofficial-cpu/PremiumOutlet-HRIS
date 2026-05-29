@@ -20,7 +20,13 @@
  */
 
 import { NextResponse } from "next/server";
+import { getApiAuthContext } from "@/lib/api-auth";
 import { createAdminSupabaseClient, createServerSupabaseClient } from "@/services/supabase-server";
+
+jest.mock("@/lib/api-auth", () => ({
+  ...jest.requireActual("@/lib/api-auth"),
+  getApiAuthContext: jest.fn(),
+}));
 
 // â”€â”€â”€ Route handlers under test â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import { POST as reconcileAbsencesPOST } from "@/app/api/attendance/reconcile-absences/route";
@@ -79,12 +85,23 @@ function mockAuthWithProfile(userId: string, role: string) {
 
 /** Mock unauthenticated Supabase */
 function mockAuthAsAnon() {
+  (getApiAuthContext as jest.Mock).mockResolvedValueOnce(null);
   (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
     auth: {
       getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
       refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
     },
     from: jest.fn(),
+  });
+}
+
+function mockApiAuthRole(role: string) {
+  (getApiAuthContext as jest.Mock).mockResolvedValueOnce({
+    userId: `uid-${role}`,
+    role,
+    supabase: {} as Awaited<ReturnType<typeof createServerSupabaseClient>>,
+    adminDb: (createAdminSupabaseClient as jest.Mock)(),
+    demoMode: false,
   });
 }
 
@@ -190,69 +207,22 @@ describe("POST /api/attendance/reconcile-absences", () => {
   });
 
   it("returns 403 when authenticated as employee (no attendance:edit)", async () => {
-    // Employee role does not have attendance:edit permission
-    (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-emp" } }, error: null }),
-      },
-      from: jest.fn((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "employee" }, error: null }),
-              }),
-            }),
-          };
-        }
-        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue({ data: null, error: null }) };
-      }),
-    });
+    mockApiAuthRole("employee");
     const req = makeRequest("POST", "http://localhost/api/attendance/reconcile-absences");
     const res = await reconcileAbsencesPOST(req);
     expect(res.status).toBe(403);
   });
 
   it("returns 403 when authenticated as supervisor (no attendance:edit)", async () => {
-    (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-sup" } }, error: null }),
-      },
-      from: jest.fn((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "supervisor" }, error: null }),
-              }),
-            }),
-          };
-        }
-        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue({ data: null, error: null }) };
-      }),
-    });
+    mockApiAuthRole("supervisor");
     const req = makeRequest("POST", "http://localhost/api/attendance/reconcile-absences");
     const res = await reconcileAbsencesPOST(req);
     expect(res.status).toBe(403);
   });
 
   it("proceeds (no 403) when authenticated as admin", async () => {
-    // Admin has attendance:edit; route will proceed to DB queries which return empty
-    (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-admin" } }, error: null }),
-      },
+    (createAdminSupabaseClient as jest.Mock).mockReturnValueOnce({
       from: jest.fn((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "admin" }, error: null }),
-              }),
-            }),
-          };
-        }
-        // employees query
         if (table === "employees") {
           return {
             select: jest.fn().mockReturnValue({
@@ -263,13 +233,15 @@ describe("POST /api/attendance/reconcile-absences", () => {
         return {
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
+          gte: jest.fn().mockReturnThis(),
+          lte: jest.fn().mockResolvedValue({ data: [], error: null }),
           single: jest.fn().mockResolvedValue({ data: null, error: null }),
         };
       }),
     });
+    mockApiAuthRole("admin");
     const req = makeRequest("POST", "http://localhost/api/attendance/reconcile-absences");
     const res = await reconcileAbsencesPOST(req);
-    // Should not be 401 or 403 â€” admin passes auth/role checks
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(403);
   });
@@ -325,25 +297,7 @@ describe("POST /api/kiosk/admin-pin", () => {
   });
 
   function mockAdminPinAuth() {
-    (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-admin" } }, error: null }),
-        refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      },
-      from: jest.fn((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "admin" }, error: null }),
-              }),
-            }),
-          };
-        }
-        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue({ data: null, error: null }) };
-      }),
-    });
-    (createAdminSupabaseClient as jest.Mock).mockResolvedValueOnce({
+    const adminDb = {
       from: jest.fn(() => ({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
@@ -355,6 +309,14 @@ describe("POST /api/kiosk/admin-pin", () => {
           eq: jest.fn().mockResolvedValue({ error: null }),
         }),
       })),
+    };
+    (createAdminSupabaseClient as jest.Mock).mockResolvedValueOnce(adminDb);
+    (getApiAuthContext as jest.Mock).mockResolvedValueOnce({
+      userId: "uid-admin",
+      role: "admin",
+      supabase: {} as Awaited<ReturnType<typeof createServerSupabaseClient>>,
+      adminDb,
+      demoMode: false,
     });
   }
 
@@ -921,20 +883,8 @@ describe("lib/permissions-server â€” compound checks and route access", () 
 
 describe("POST /api/attendance/reconcile-absences â€” main logic", () => {
   it("returns ok:true with created:0 when there are no active employees", async () => {
-    (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-admin" } }, error: null }),
-      },
+    (createAdminSupabaseClient as jest.Mock).mockReturnValueOnce({
       from: jest.fn((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "admin" }, error: null }),
-              }),
-            }),
-          };
-        }
         if (table === "employees") {
           return {
             select: jest.fn().mockReturnValue({
@@ -942,9 +892,10 @@ describe("POST /api/attendance/reconcile-absences â€” main logic", () => {
             }),
           };
         }
-        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue({ data: null, error: null }) };
+        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), gte: jest.fn().mockReturnThis(), lte: jest.fn().mockResolvedValue({ data: [], error: null }), single: jest.fn().mockResolvedValue({ data: null, error: null }) };
       }),
     });
+    mockApiAuthRole("admin");
     const req = makeRequest("POST", "http://localhost/api/attendance/reconcile-absences", {
       startDate: "2025-01-01",
       endDate: "2025-01-31",
@@ -957,20 +908,8 @@ describe("POST /api/attendance/reconcile-absences â€” main logic", () => {
   });
 
   it("returns 500 when employees DB query fails", async () => {
-    (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-admin" } }, error: null }),
-      },
+    (createAdminSupabaseClient as jest.Mock).mockReturnValueOnce({
       from: jest.fn((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "admin" }, error: null }),
-              }),
-            }),
-          };
-        }
         if (table === "employees") {
           return {
             select: jest.fn().mockReturnValue({
@@ -981,6 +920,7 @@ describe("POST /api/attendance/reconcile-absences â€” main logic", () => {
         return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue({ data: null, error: null }) };
       }),
     });
+    mockApiAuthRole("admin");
     const req = makeRequest("POST", "http://localhost/api/attendance/reconcile-absences");
     const res = await reconcileAbsencesPOST(req);
     expect(res.status).toBe(500);
@@ -988,20 +928,8 @@ describe("POST /api/attendance/reconcile-absences â€” main logic", () => {
 
   it("proceeds through main loop when employees exist (hr role)", async () => {
     const employee = { id: "EMP01", name: "Juan", work_days: ["Mon","Tue","Wed","Thu","Fri"], join_date: "2024-01-01", status: "active" };
-    (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-hr" } }, error: null }),
-      },
+    (createAdminSupabaseClient as jest.Mock).mockReturnValueOnce({
       from: jest.fn((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "hr" }, error: null }),
-              }),
-            }),
-          };
-        }
         if (table === "employees") {
           return {
             select: jest.fn().mockReturnValue({
@@ -1061,6 +989,7 @@ describe("POST /api/attendance/reconcile-absences â€” main logic", () => {
         };
       }),
     });
+    mockApiAuthRole("hr");
     const req = makeRequest("POST", "http://localhost/api/attendance/reconcile-absences", {
       startDate: "2025-01-06",
       endDate: "2025-01-06",
