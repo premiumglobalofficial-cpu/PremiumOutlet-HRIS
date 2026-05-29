@@ -59,13 +59,16 @@ export async function POST(req: Request) {
   // 1. Get all active employees with their work_days
   const { data: employees, error: empErr } = await db
     .from("employees")
-    .select("id, name, work_days, join_date, status")
+    .select("id, name, join_date, status")
     .eq("status", "active");
 
   if (empErr) {
     console.error("[reconcile-absences] Failed to fetch employees:", empErr);
     return NextResponse.json(
-      { error: "Failed to fetch employees" },
+      {
+        error: "Failed to fetch employees",
+        ...(process.env.NODE_ENV === "development" ? { details: empErr.message } : {}),
+      },
       { status: 500 }
     );
   }

@@ -187,7 +187,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!mounted) return;
-        if (!isAuthenticated && pathname !== "/login" && pathname !== "/deactivated") {
+        const isKioskPath = pathname === "/kiosk" || pathname.startsWith("/kiosk/");
+        if (!isAuthenticated && pathname !== "/login" && pathname !== "/deactivated" && !isKioskPath) {
             // Hard navigation so the middleware re-evaluates cookies cleanly
             window.location.href = "/login";
         }
@@ -281,7 +282,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     if (!mounted) return <AppLoadingScreen />;
 
     // Show spinner while the unauthenticated redirect is in-flight
-    if (!isAuthenticated && !isLoginPage && !isDeactivated) return <AppLoadingScreen />;
+    if (!isAuthenticated && !isLoginPage && !isDeactivated && !isKiosk) return <AppLoadingScreen />;
 
     return (
         <TooltipProvider>

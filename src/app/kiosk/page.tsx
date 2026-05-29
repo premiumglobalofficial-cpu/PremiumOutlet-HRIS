@@ -150,7 +150,7 @@ export default function KioskLandingPage() {
     });
 
     return (
-        <div className="fixed inset-0 flex flex-col bg-black select-none overflow-hidden">
+        <div data-testid="kiosk-landing" className="fixed inset-0 flex flex-col bg-black select-none overflow-hidden">
             {/* Animated gradient background */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
                 <div 

@@ -30,9 +30,20 @@ export async function GET() {
       .single();
 
     if (error) {
-      if (error.message?.includes("module_flags")) {
-        return NextResponse.json({ modules: DEFAULT_MODULE_FLAGS, note: "Module flags column not yet migrated" });
+      // Graceful defaults so UI and E2E work before appearance_config is fully migrated
+      if (
+        error.code === "PGRST116" ||
+        error.code === "42P01" ||
+        error.message?.includes("0 rows") ||
+        error.message?.includes("module_flags") ||
+        error.message?.includes("appearance_config")
+      ) {
+        return NextResponse.json({
+          modules: DEFAULT_MODULE_FLAGS,
+          note: "Using defaults — appearance_config not fully available",
+        });
       }
+      console.error("[API] settings/appearance GET:", error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
