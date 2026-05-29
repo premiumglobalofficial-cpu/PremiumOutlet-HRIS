@@ -1,21 +1,14 @@
 import { DEFAULT_MODULE_FLAGS } from "@/store/appearance.store";
+import { getApiAuthContext } from "@/lib/api-auth";
+
+jest.mock("@/lib/api-auth", () => ({
+  ...jest.requireActual("@/lib/api-auth"),
+  getApiAuthContext: jest.fn(),
+}));
 
 describe("GET /api/settings/appearance", () => {
-  let createServerSupabaseClient: jest.Mock;
-  let createAdminSupabaseClient: jest.Mock;
-
-  beforeEach(() => {
-    jest.resetModules();
-    const serverMod = jest.requireMock("@/services/supabase-server");
-    createServerSupabaseClient = serverMod.createServerSupabaseClient;
-    createAdminSupabaseClient = serverMod.createAdminSupabaseClient;
-  });
-
   it("returns 401 when unauthenticated", async () => {
-    createServerSupabaseClient.mockResolvedValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: { message: "No session" } }) },
-      from: jest.fn(),
-    });
+    (getApiAuthContext as jest.Mock).mockResolvedValueOnce(null);
 
     const { GET } = await import("@/app/api/settings/appearance/route");
     const res = await GET();
@@ -24,26 +17,7 @@ describe("GET /api/settings/appearance", () => {
   });
 
   it("returns normalized module flags when authenticated", async () => {
-    createServerSupabaseClient.mockResolvedValue({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "user-1" } }, error: null }),
-        refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      },
-      from: jest.fn((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "employee" }, error: null }),
-              }),
-            }),
-          };
-        }
-        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn() };
-      }),
-    });
-
-    createAdminSupabaseClient.mockResolvedValue({
+    const adminDb = {
       from: jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
@@ -54,6 +28,14 @@ describe("GET /api/settings/appearance", () => {
           }),
         }),
       }),
+    };
+
+    (getApiAuthContext as jest.Mock).mockResolvedValueOnce({
+      userId: "user-1",
+      role: "employee",
+      supabase: {},
+      adminDb,
+      demoMode: false,
     });
 
     const { GET } = await import("@/app/api/settings/appearance/route");
@@ -68,35 +50,8 @@ describe("GET /api/settings/appearance", () => {
 });
 
 describe("PATCH /api/settings/appearance", () => {
-  let createServerSupabaseClient: jest.Mock;
-  let createAdminSupabaseClient: jest.Mock;
-
-  beforeEach(() => {
-    jest.resetModules();
-    const serverMod = jest.requireMock("@/services/supabase-server");
-    createServerSupabaseClient = serverMod.createServerSupabaseClient;
-    createAdminSupabaseClient = serverMod.createAdminSupabaseClient;
-  });
-
   it("returns 401 for non-admin users", async () => {
-    createServerSupabaseClient.mockResolvedValue({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "user-1" } }, error: null }),
-        refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      },
-      from: jest.fn((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "hr" }, error: null }),
-              }),
-            }),
-          };
-        }
-        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn() };
-      }),
-    });
+    (getApiAuthContext as jest.Mock).mockResolvedValueOnce(null);
 
     const { PATCH } = await import("@/app/api/settings/appearance/route");
     const req = new Request("http://localhost/api/settings/appearance", {
@@ -109,28 +64,17 @@ describe("PATCH /api/settings/appearance", () => {
   });
 
   it("persists module flags for admin users", async () => {
-    createServerSupabaseClient.mockResolvedValue({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "admin-1" } }, error: null }),
-        refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      },
-      from: jest.fn((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "admin" }, error: null }),
-              }),
-            }),
-          };
-        }
-        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn() };
-      }),
-    });
-
     const upsert = jest.fn().mockResolvedValue({ error: null });
-    createAdminSupabaseClient.mockResolvedValue({
+    const adminDb = {
       from: jest.fn(() => ({ upsert })),
+    };
+
+    (getApiAuthContext as jest.Mock).mockResolvedValueOnce({
+      userId: "admin-1",
+      role: "admin",
+      supabase: {},
+      adminDb,
+      demoMode: false,
     });
 
     const { PATCH } = await import("@/app/api/settings/appearance/route");
