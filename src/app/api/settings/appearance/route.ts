@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminSupabaseClient, createServerSupabaseClient } from "@/services/supabase-server";
+import { getApiAuthContext } from "@/lib/api-auth";
 import { DEFAULT_MODULE_FLAGS, type ModuleFlags } from "@/store/appearance.store";
 
 function normalizeModuleFlags(value: unknown): ModuleFlags {
@@ -16,24 +16,14 @@ function normalizeModuleFlags(value: unknown): ModuleFlags {
   return next;
 }
 
-async function requireAuthenticatedUser() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return { ok: false as const, response: NextResponse.json({ error: "Not authenticated" }, { status: 401 }) };
-  }
-
-  return { ok: true as const, user };
-}
-
 export async function GET() {
   try {
-    const auth = await requireAuthenticatedUser();
-    if (!auth.ok) return auth.response;
+    const ctx = await getApiAuthContext();
+    if (!ctx) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
 
-    const admin = await createAdminSupabaseClient();
-    const { data, error } = await admin
+    const { data, error } = await ctx.adminDb
       .from("appearance_config")
       .select("module_flags")
       .eq("id", "default")
@@ -55,28 +45,15 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    const auth = await requireAuthenticatedUser();
-    if (!auth.ok) return auth.response;
-
-    const admin = await createAdminSupabaseClient();
-    const { data: profile, error: profileError } = await admin
-      .from("profiles")
-      .select("role")
-      .eq("id", auth.user.id)
-      .single();
-
-    if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 500 });
-    }
-
-    if (profile?.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const ctx = await getApiAuthContext({ requireAdmin: true });
+    if (!ctx) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const body = await request.json();
     const modules = normalizeModuleFlags(body?.modules);
 
-    const { error } = await admin
+    const { error } = await ctx.adminDb
       .from("appearance_config")
       .upsert({ id: "default", company_name: "Premium Outlets", module_flags: modules }, { onConflict: "id" });
 

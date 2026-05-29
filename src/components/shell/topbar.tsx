@@ -338,8 +338,10 @@ export function Topbar() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 onClick={async () => {
+                                    const { clearDemoSessionCookie } = await import("@/services/demo-session.client");
                                     logout();
                                     stopWriteThrough();
+                                    await clearDemoSessionCookie();
                                     await signOut().catch(() => {});
                                     window.location.href = "/login";
                                 }}

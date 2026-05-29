@@ -53,6 +53,9 @@ import { useDepartmentsStore } from "@/store/departments.store";
 import { useProjectsStore } from "@/store/projects.store";
 import { ThirteenthMonthModal } from "@/components/payroll/thirteenth-month-modal";
 import { SaCommissionPanel } from "@/components/payroll/sa-commission-panel";
+import { useSaCommissionStore } from "@/store/sa-commission.store";
+import { getApprovedSaIncentiveAllowances, resolvePayrollOvertimeForSa } from "@/lib/sa-payroll-bridge";
+import { persistSaCycle } from "@/services/sa-commission.service";
 import { ExportBackupDialog } from "@/components/export-backup-dialog";
 import { ImportDataDialog } from "@/components/import-data-dialog";
 import PayrollPaymentWizard, { type WizardStep, usePayrollProgress } from "@/features/payroll-payment/payroll-payment-wizard";
@@ -75,6 +78,8 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
     const params = useParams();
     const role = params.role as string;
     const { payslips, runs, adjustments, finalPayComputations, issuePayslip, confirmPayslip, publishPayslip, recordPayment, confirmPaidByFinance, holdPayment, releasePaymentHold, rejectHoldSignature, lockRun, unlockRun, publishRun, endRun, reactivateRun, markRunPaid, approveAdjustment, applyAdjustment, createAdjustment, computeFinalPay, generate13thMonth, exportBankFile, createDraftRun, validateRun, resetToSeed, paySchedule, updatePaySchedule, savePaySchedule, signatureConfig, updateSignatureConfig, deductionOverrides, setDeductionOverride, removeDeductionOverride, clearEmployeeOverrides, getDeductionOverride, getEmployeeOverrides, globalDefaults, updateGlobalDefault, getGlobalDefault, updatePayslipFromServer, isPayslipRunLocked, batchReleasePaymentHold, batchPublishPayslips, batchRecordPayment } = usePayrollStore();
+    const getApprovedSaPayouts = useSaCommissionStore((s) => s.getApprovedPayouts);
+    const markSaPayoutsProcessed = useSaCommissionStore((s) => s.markPayoutsProcessed);
     const employees = useEmployeesStore((s) => s.employees);
     const currentUser = useAuthStore((s) => s.currentUser);
     const { getActiveByEmployee, recordDeduction } = useLoansStore();
@@ -405,6 +410,9 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
             let totalLoanDeductions = 0;
             let skippedDuplicates = 0;
             let zeroNetPayCount = 0;
+            const saPayMonth = selectedMonth;
+            const approvedSaPayouts = getApprovedSaPayouts(saPayMonth);
+            const saProcessedIds: string[] = [];
 
             selectedEmployeeIds.forEach((empId) => {
                 const emp = employees.find((e) => e.id === empId);
@@ -458,7 +466,14 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                 const empLoanDeduction = Math.min(rawLoanDeduction, Math.round(effectiveGrossPay * 0.30));
                 totalLoanDeductions += empLoanDeduction;
 
-                const allowances = allowancesVal;
+                const { amount: saIncentive, note: saNote } = getApprovedSaIncentiveAllowances(
+                    approvedSaPayouts,
+                    saPayMonth,
+                    empId,
+                );
+                if (saIncentive > 0) saProcessedIds.push(empId);
+
+                const allowances = allowancesVal + saIncentive;
                 const otherDed = otherDedVal;
                 const otHours = otHoursVal;
                 const nightDiffHours = nightDiffVal;
@@ -536,7 +551,11 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                     .reduce((sum, item) => sum + item.amount, 0);
 
                 const hourlyRate = Math.round(dailyRate / 8);
-                const otPay = Math.round(otHours * hourlyRate * 1.25); // PH Labor Code: OT at 125%
+                const { otPay, skipFormOt } = resolvePayrollOvertimeForSa(
+                    saIncentive > 0,
+                    otHours,
+                    hourlyRate,
+                );
                 const nightDiffPay = Math.round(nightDiffHours * hourlyRate * 0.10); // PH: +10% for 10PM-6AM
                 const periodHolidays = holidays.filter((h) => h.date >= cutoffDates.start && h.date <= cutoffDates.end);
                 let holidayPaySupp = 0;
@@ -631,18 +650,33 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                     attendanceUndertimeHours: undertimeHoursAgg,
                     // Gross override flag
                     grossOverrideApplied: overrideStr && Number(overrideStr) > 0 ? true : undefined,
-                    notes: formNotes || [
+                    notes: [
+                        formNotes,
                         isProrPartial ? `Prorated: ${prorActual}/${prorNominal} days (${Math.round(prorFactor * 1000) / 10}%)` : "",
                         overrideStr && Number(overrideStr) > 0 ? `Gross overridden to ₱${Number(overrideStr).toLocaleString()}` : "",
-                        otHours > 0 ? `OT: ${otHours}hrs (\u20B1${otPay})` : "",
+                        otHours > 0 && !skipFormOt ? `OT: ${otHours}hrs (\u20B1${otPay})` : "",
+                        skipFormOt && saIncentive > 0 ? "SA OT included in incentives" : "",
                         nightDiffHours > 0 ? `ND: ${nightDiffHours}hrs (\u20B1${nightDiffPay})` : "",
-                    ].filter(Boolean).join(" · ") || undefined, issuedAt: formIssuedAt,
+                        saNote,
+                    ].filter(Boolean).join(" · ") || undefined,
+                    issuedAt: formIssuedAt,
                 });
 
                 const actualPayslipId = usePayrollStore.getState().payslips.filter((p) => p.employeeId === empId).sort((a, b) => b.id.localeCompare(a.id))[0]?.id ?? `PS-fallback-${Date.now()}`;
                 empLoans.forEach((loan) => { const amt = Math.min(loan.monthlyDeduction, loan.remainingBalance); if (amt > 0) recordDeduction(loan.id, actualPayslipId, amt); });
                 successCount++;
             });
+
+            if (saProcessedIds.length > 0) {
+                markSaPayoutsProcessed(saPayMonth, saProcessedIds);
+                const saState = useSaCommissionStore.getState();
+                for (const c of saState.cycles.filter((x) => x.month === saPayMonth)) {
+                    void persistSaCycle(
+                        c,
+                        saState.profiles.filter((p) => p.branchId === c.branchId),
+                    );
+                }
+            }
 
             const loanMsg = totalLoanDeductions > 0 ? ` (incl. ${formatCurrency(totalLoanDeductions)} total loan deductions)` : "";
             if (skippedDuplicates > 0) toast.warning(`${skippedDuplicates} employee${skippedDuplicates > 1 ? "s" : ""} already had payslips for this period — skipped.`);
@@ -2852,12 +2886,12 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                             availablePeriods={last12Months}
                         />
                     </TabsContent>
+                )}
 
-                    {canIssue && (
-                        <TabsContent value="sa-incentives" className="mt-4">
-                            <SaCommissionPanel />
-                        </TabsContent>
-                    )}
+                {canIssue && (
+                    <TabsContent value="sa-incentives" className="mt-4">
+                        <SaCommissionPanel />
+                    </TabsContent>
                 )}
             </Tabs>
 

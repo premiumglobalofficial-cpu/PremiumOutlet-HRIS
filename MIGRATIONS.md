@@ -101,6 +101,7 @@ If you prefer the original incremental chain (useful when only applying a single
 | 059 | `059_fix_account_role_sync.sql`                              | Auth ↔ role sync trigger fix                                       |
 | 060 | `060_tasks_schema_updates.sql`                               | Task schema updates                                                |
 | 061 | `061_appearance_module_flags.sql`                            | Appearance customization + module toggles                          |
+| 062 | `062_sa_commission.sql`                                      | POGRC SA commission: profiles, cycles, payouts, compliance, OT     |
 
 > When new migrations are added later, **append** them to this list — never re-order or rename existing ones.
 

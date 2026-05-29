@@ -150,7 +150,7 @@ export const useKioskStore = create<KioskStore>()(
 
       fetchConfig: async () => {
         try {
-          const res = await fetch("/api/settings/kiosk");
+          const res = await fetch("/api/settings/kiosk", { credentials: "include" });
           if (!res.ok) return;
           const data = await res.json();
           if (data && typeof data === "object") {
@@ -174,6 +174,7 @@ export const useKioskStore = create<KioskStore>()(
         const { adminPin, ...safeSettings } = get().settings;
         void fetch("/api/settings/kiosk", {
           method: "PATCH",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...safeSettings, ...patch }),
         }).catch(() => {});
@@ -186,6 +187,7 @@ export const useKioskStore = create<KioskStore>()(
         const { adminPin, ...safeDefaults } = DEFAULT_SETTINGS;
         void fetch("/api/settings/kiosk", {
           method: "PATCH",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(safeDefaults),
         }).catch(() => {});

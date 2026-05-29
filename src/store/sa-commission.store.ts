@@ -45,6 +45,8 @@ interface SaCommissionState {
   approvePayout: (payoutId: string, approvedBy: string) => void;
   getApprovedPayouts: (month: string) => SaPayoutRecord[];
   getPayoutForEmployee: (month: string, employeeId: string) => SaPayoutRecord | undefined;
+  replaceCycle: (cycle: SaMonthlyCycle) => void;
+  markPayoutsProcessed: (month: string, employeeIds: string[]) => void;
 }
 
 function cycleKey(month: string, branchId: string) {
@@ -237,7 +239,10 @@ export const useSaCommissionStore = create<SaCommissionState>()(
 
         const payouts: SaPayoutRecord[] = branchProfiles.map((p) => {
           const prev = cycle.payouts.find((x) => x.employeeId === p.employeeId);
-          const status: SaPayoutStatus = prev?.status === "approved" ? "approved" : "draft";
+          const status: SaPayoutStatus =
+            prev?.status === "approved" || prev?.status === "processed"
+              ? prev.status
+              : "draft";
 
           const breakdown = buildMonthlySaPayout({
             employeeId: p.employeeId,
@@ -303,6 +308,34 @@ export const useSaCommissionStore = create<SaCommissionState>()(
           if (p) return p;
         }
         return undefined;
+      },
+
+      replaceCycle: (cycle) => {
+        set((s) => {
+          const rest = s.cycles.filter(
+            (c) => !(c.month === cycle.month && c.branchId === cycle.branchId),
+          );
+          return { cycles: [...rest, cycle] };
+        });
+      },
+
+      markPayoutsProcessed: (month, employeeIds) => {
+        const idSet = new Set(employeeIds);
+        set((s) => ({
+          cycles: s.cycles.map((c) =>
+            c.month !== month
+              ? c
+              : {
+                  ...c,
+                  payouts: c.payouts.map((p) =>
+                    idSet.has(p.employeeId) && p.status === "approved"
+                      ? { ...p, status: "processed" as const }
+                      : p,
+                  ),
+                  updatedAt: new Date().toISOString(),
+                },
+          ),
+        }));
       },
     }),
     {

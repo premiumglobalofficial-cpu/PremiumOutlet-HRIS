@@ -120,25 +120,20 @@ export default function KioskSettingsPage() {
         try {
             const res = await fetch("/api/kiosk/admin-pin", {
                 method: "POST",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ pin: newPin }),
             });
+            const err = (await res.json().catch(() => ({}))) as { error?: string };
             if (!res.ok) {
-                const err = await res.json() as { error?: string };
-                if (res.status !== 401 && res.status !== 403) {
-                    updateSettings({ adminPin: newPin });
-                    toast.success("PIN updated (saved locally)");
-                } else {
-                    toast.error(err.error ?? "Failed to save PIN");
-                    return;
-                }
-            } else {
-                updateSettings({ adminPin: newPin });
-                toast.success("Kiosk PIN updated and saved");
+                toast.error(err.error ?? "Failed to save PIN");
+                return;
             }
-        } catch {
             updateSettings({ adminPin: newPin });
-            toast.success("PIN updated (saved locally)");
+            toast.success("Kiosk PIN updated and saved");
+        } catch {
+            toast.error("Failed to save PIN — check your connection");
+            return;
         } finally {
             setSavingPin(false);
             setChangingPin(false);

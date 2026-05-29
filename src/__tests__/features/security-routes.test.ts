@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Security Route Tests
  * =====================
  * Tests auth + RBAC guards for all security-critical API routes added/modified
@@ -20,7 +20,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/services/supabase-server";
+import { createAdminSupabaseClient, createServerSupabaseClient } from "@/services/supabase-server";
 
 // â”€â”€â”€ Route handlers under test â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import { POST as reconcileAbsencesPOST } from "@/app/api/attendance/reconcile-absences/route";
@@ -82,6 +82,7 @@ function mockAuthAsAnon() {
   (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
     auth: {
       getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+      refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
     },
     from: jest.fn(),
   });
@@ -299,13 +300,14 @@ describe("POST /api/kiosk/admin-pin", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 403 when authenticated as hr (non-admin)", async () => {
+  it("returns 401 when authenticated as hr (non-admin)", async () => {
     (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
       auth: {
         getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-hr" } }, error: null }),
+        refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
       },
       from: jest.fn((table: string) => {
-        if (table === "employees") {
+        if (table === "profiles") {
           return {
             select: jest.fn().mockReturnValue({
               eq: jest.fn().mockReturnValue({
@@ -319,16 +321,17 @@ describe("POST /api/kiosk/admin-pin", () => {
     });
     const req = makeRequest("POST", "http://localhost/api/kiosk/admin-pin", { pin: "1234" });
     const res = await adminPinPOST(req);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
   });
 
-  it("returns 400 for invalid PIN format (too short)", async () => {
+  function mockAdminPinAuth() {
     (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
       auth: {
         getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-admin" } }, error: null }),
+        refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
       },
       from: jest.fn((table: string) => {
-        if (table === "employees") {
+        if (table === "profiles") {
           return {
             select: jest.fn().mockReturnValue({
               eq: jest.fn().mockReturnValue({
@@ -340,66 +343,37 @@ describe("POST /api/kiosk/admin-pin", () => {
         return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue({ data: null, error: null }) };
       }),
     });
+    (createAdminSupabaseClient as jest.Mock).mockResolvedValueOnce({
+      from: jest.fn(() => ({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+        insert: jest.fn().mockResolvedValue({ error: null }),
+        update: jest.fn().mockReturnValue({
+          eq: jest.fn().mockResolvedValue({ error: null }),
+        }),
+      })),
+    });
+  }
+
+  it("returns 400 for invalid PIN format (too short)", async () => {
+    mockAdminPinAuth();
     const req = makeRequest("POST", "http://localhost/api/kiosk/admin-pin", { pin: "12" });
     const res = await adminPinPOST(req);
     expect(res.status).toBe(400);
   });
 
   it("returns 400 for non-digit PIN", async () => {
-    (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-admin" } }, error: null }),
-      },
-      from: jest.fn((table: string) => {
-        if (table === "employees") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "admin" }, error: null }),
-              }),
-            }),
-          };
-        }
-        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue({ data: null, error: null }) };
-      }),
-    });
+    mockAdminPinAuth();
     const req = makeRequest("POST", "http://localhost/api/kiosk/admin-pin", { pin: "abcd" });
     const res = await adminPinPOST(req);
     expect(res.status).toBe(400);
   });
 
   it("saves valid PIN as admin and returns 200", async () => {
-    (createServerSupabaseClient as jest.Mock).mockReturnValueOnce({
-      auth: {
-        getUser: jest.fn().mockResolvedValue({ data: { user: { id: "uid-admin" } }, error: null }),
-      },
-      from: jest.fn((table: string) => {
-        if (table === "employees") {
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                single: jest.fn().mockResolvedValue({ data: { role: "admin" }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "kiosk_pins") {
-          // Route does select().eq().maybeSingle() then insert()
-          return {
-            select: jest.fn().mockReturnValue({
-              eq: jest.fn().mockReturnValue({
-                maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-              }),
-            }),
-            insert: jest.fn().mockResolvedValue({ error: null }),
-            update: jest.fn().mockReturnValue({
-              eq: jest.fn().mockResolvedValue({ error: null }),
-            }),
-          };
-        }
-        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue({ data: null, error: null }) };
-      }),
-    });
+    mockAdminPinAuth();
     const req = makeRequest("POST", "http://localhost/api/kiosk/admin-pin", { pin: "1234" });
     const res = await adminPinPOST(req);
     expect(res.status).toBe(200);

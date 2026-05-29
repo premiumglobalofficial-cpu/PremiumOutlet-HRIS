@@ -1,11 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { useEmployeesStore } from "@/store/employees.store";
 import { useSaCommissionStore } from "@/store/sa-commission.store";
 import { useAuthStore } from "@/store/auth.store";
-import { toPayrollIncentiveAllowances, SA_STORE_GOAL_THRESHOLD } from "@/lib/sa-commission";
+import {
+  toPayrollIncentiveAllowances,
+  SA_STORE_GOAL_THRESHOLD,
+  type SaComplianceDeducted,
+  type SaComplianceEarned,
+} from "@/lib/sa-commission";
+import { SaComplianceKpiForm } from "@/components/payroll/sa-compliance-kpi-form";
+import { fetchSaCycle, persistSaCycle } from "@/services/sa-commission.service";
 import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,13 +55,17 @@ export function SaCommissionPanel() {
     setBranchSales,
     setEmployeeSales,
     setEmployeeOtDays,
+    setCompliance,
+    setEmployeeKpi,
     approvePayout,
     recomputePayouts,
     getApprovedPayouts,
+    replaceCycle,
   } = useSaCommissionStore();
 
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
   const [branchId, setBranchId] = useState("main");
+  const [complianceEmpId, setComplianceEmpId] = useState("");
 
   const cycle = useMemo(
     () => cycles.find((c) => c.month === month && c.branchId === branchId),
@@ -70,6 +81,83 @@ export function SaCommissionPanel() {
           profiles.some((p) => p.employeeId === e.id && p.isSalesAssociate)),
     );
   }, [employees, profiles]);
+
+  useEffect(() => {
+    if (branchEmployees.length > 0 && !complianceEmpId) {
+      setComplianceEmpId(branchEmployees[0].id);
+    }
+  }, [branchEmployees, complianceEmpId]);
+
+  const syncCycle = useCallback(async () => {
+    const state = useSaCommissionStore.getState();
+    const c = state.cycles.find((x) => x.month === month && x.branchId === branchId);
+    if (!c) return;
+    const branchProfiles = state.profiles.filter((p) => p.branchId === branchId);
+    const result = await persistSaCycle(c, branchProfiles);
+    if (!result.ok) toast.error(result.error ?? "Failed to sync SA cycle to database");
+  }, [month, branchId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSaCycle(month, branchId).then((remote) => {
+      if (cancelled || !remote) return;
+      const local = useSaCommissionStore
+        .getState()
+        .cycles.find((c) => c.month === month && c.branchId === branchId);
+      if (!local) {
+        replaceCycle(remote);
+        return;
+      }
+      const remoteTs = new Date(remote.updatedAt).getTime();
+      const localTs = new Date(local.updatedAt).getTime();
+      if (remoteTs > localTs) replaceCycle(remote);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [month, branchId, replaceCycle]);
+
+  const emptyEarned = (): SaComplianceEarned => ({
+    attendanceWeeks: 0,
+    groomingWeeks: 0,
+    floorWeeks: 0,
+    photoWeeks: 0,
+    groupchatWeeks: 0,
+    commitmentWeeks: 0,
+    trainingSessions: 0,
+    proactiveIncidents: 0,
+    cashierWeeks: 0,
+    highestSalesWins: 0,
+  });
+
+  const emptyDeducted = (): SaComplianceDeducted => ({
+    lateArrival: 0,
+    hairViolation: 0,
+    uniformViolation: 0,
+    zoneUncovered: 0,
+    noGreeting: 0,
+    phoneUse: 0,
+    photoMissed: 0,
+    groupchatMissed: 0,
+    missedTraining: 0,
+    lateKpiReport: 0,
+    repeatedViolation: 0,
+    cashShortage: 0,
+    counterUnattended: 0,
+  });
+
+  const complianceEarned =
+    cycle?.complianceEarned[complianceEmpId] ?? emptyEarned();
+  const complianceDeducted =
+    cycle?.complianceDeducted[complianceEmpId] ?? emptyDeducted();
+  const complianceKpi = cycle?.kpiByEmployee[complianceEmpId] ?? {
+    unitsSold: 0,
+    revenue: 0,
+    upsells: 0,
+    commendations: 0,
+    complaints: 0,
+    shiftsWorked: 0,
+  };
 
   const ensureProfiles = () => {
     for (const emp of branchEmployees) {
@@ -89,6 +177,7 @@ export function SaCommissionPanel() {
     ensureProfiles();
     getOrCreateCycle(month, branchId);
     recomputePayouts(month, branchId);
+    void syncCycle();
     toast.success("SA cycle initialized");
   };
 
@@ -208,6 +297,27 @@ export function SaCommissionPanel() {
           </div>
         </CardContent>
       </Card>
+
+      <SaComplianceKpiForm
+        key={complianceEmpId}
+        employees={branchEmployees.map((e) => ({ id: e.id, name: e.name }))}
+        employeeId={complianceEmpId}
+        onEmployeeChange={setComplianceEmpId}
+        earned={complianceEarned}
+        deducted={complianceDeducted}
+        kpi={complianceKpi}
+        onSave={(earned, deducted, kpi) => {
+          const targetId = complianceEmpId;
+          if (!targetId) return;
+          ensureProfiles();
+          getOrCreateCycle(month, branchId);
+          setCompliance(month, branchId, targetId, earned, deducted);
+          setEmployeeKpi(month, branchId, targetId, kpi);
+          recomputePayouts(month, branchId);
+          void syncCycle();
+          toast.success("Compliance & KPI saved");
+        }}
+      />
 
       <Card>
         <CardHeader>
@@ -341,6 +451,7 @@ export function SaCommissionPanel() {
                             onClick={() => {
                               if (!payout) return;
                               approvePayout(payout.id, currentUser.email);
+                              void syncCycle();
                               toast.success(`Approved payout for ${emp.name}`);
                             }}
                           >

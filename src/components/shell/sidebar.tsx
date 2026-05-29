@@ -402,8 +402,10 @@ function SidebarComponent() {
                     <TooltipTrigger asChild>
                         <button
                             onClick={async () => {
+                                const { clearDemoSessionCookie } = await import("@/services/demo-session.client");
                                 useAuthStore.getState().logout();
                                 stopWriteThrough();
+                                await clearDemoSessionCookie();
                                 await signOut().catch(() => {});
                                 window.location.href = "/login";
                             }}

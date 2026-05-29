@@ -81,7 +81,7 @@ export const useLocationStore = create<LocationState>()(
             // ─── Config ────────────────────────────────
             fetchConfig: async () => {
                 try {
-                    const res = await fetch("/api/settings/location");
+                    const res = await fetch("/api/settings/location", { credentials: "include" });
                     if (res.ok) {
                         const data = await res.json();
                         if (data) {

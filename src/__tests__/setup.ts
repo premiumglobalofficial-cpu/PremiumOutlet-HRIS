@@ -41,9 +41,11 @@ jest.mock("@/services/supabase-server", () => ({
       delete: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
     })),
     auth: {
       getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+      refreshSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
     },
   })),
   createAdminSupabaseClient: jest.fn(() => ({
@@ -54,6 +56,7 @@ jest.mock("@/services/supabase-server", () => ({
       delete: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
     })),
     auth: {
       admin: {

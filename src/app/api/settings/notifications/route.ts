@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/services/supabase-server";
+import { getApiAuthContext } from "@/lib/api-auth";
 
 // ─── Rule: camelCase ↔ snake_case mapping ────────────────────────────────────
 
@@ -66,12 +66,12 @@ function providerToDb(config: Record<string, unknown>) {
 // ─── GET /api/settings/notifications ─────────────────────────────────────────
 // Returns { rules: [...], providerConfig: {...} }
 export async function GET() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ctx = await getApiAuthContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Fetch rules
-  const { data: rulesData, error: rulesErr } = await supabase
+  const db = ctx.demoMode ? ctx.adminDb : ctx.supabase;
+
+  const { data: rulesData, error: rulesErr } = await db
     .from("notification_rules")
     .select("*")
     .order("id");
@@ -81,7 +81,7 @@ export async function GET() {
   }
 
   // Fetch provider config
-  const { data: providerData, error: providerErr } = await supabase
+  const { data: providerData, error: providerErr } = await db
     .from("notification_provider_config")
     .select("*")
     .eq("id", "default")
@@ -103,20 +103,10 @@ export async function GET() {
 //   { rules: [...] }                      — bulk upsert all rules
 //   { providerConfig: { ...patch } }      — update provider config
 export async function PATCH(req: Request) {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ctx = await getApiAuthContext({ requireAdmin: true });
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Only admin can change notification settings
-  const { data: emp } = await supabase
-    .from("employees")
-    .select("role")
-    .eq("profile_id", user.id)
-    .single();
-  if (!emp || emp.role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+  const db = ctx.demoMode ? ctx.adminDb : ctx.supabase;
   const body = await req.json();
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
@@ -125,7 +115,7 @@ export async function PATCH(req: Request) {
   // ── Single rule update ──
   if (body.rule && typeof body.rule === "object" && body.rule.id) {
     const dbRule = ruleToDb(body.rule);
-    const { error } = await supabase
+    const { error } = await db
       .from("notification_rules")
       .upsert(dbRule)
       .eq("id", body.rule.id);
@@ -137,7 +127,7 @@ export async function PATCH(req: Request) {
   // ── Bulk rules upsert ──
   if (Array.isArray(body.rules)) {
     const dbRules = body.rules.map((r: Record<string, unknown>) => ruleToDb(r));
-    const { error } = await supabase
+    const { error } = await db
       .from("notification_rules")
       .upsert(dbRules);
 
@@ -153,7 +143,7 @@ export async function PATCH(req: Request) {
     }
     dbRow.updated_at = new Date().toISOString();
 
-    const { error } = await supabase
+    const { error } = await db
       .from("notification_provider_config")
       .upsert({ id: "default", ...dbRow });
 

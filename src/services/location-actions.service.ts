@@ -18,6 +18,7 @@ export async function updateConfig(patch: Partial<LocationTrackingConfig>): Prom
     try {
         const res = await fetch("/api/settings/location", {
             method: "PATCH",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(patch),
         });
@@ -40,6 +41,7 @@ export async function resetConfig(defaults: LocationTrackingConfig): Promise<boo
     try {
         const res = await fetch("/api/settings/location", {
             method: "PATCH",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(defaults),
         });

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { KeyRound, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { syncDemoSessionCookie } from "@/services/demo-session.client";
 
 const USE_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
@@ -212,8 +213,17 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         }
     }, [isAuthenticated, mounted, employees, currentUser, pathname]);
 
+    // Demo mode: keep httpOnly demo session cookie in sync with Zustand (page refresh).
+    useEffect(() => {
+        if (!mounted || !isAuthenticated || !USE_DEMO_MODE || !currentUser) return;
+        void syncDemoSessionCookie({
+            id: currentUser.id,
+            role: currentUser.role,
+            email: currentUser.email,
+        });
+    }, [mounted, isAuthenticated, currentUser?.id, currentUser?.role, currentUser?.email]);
+
     // Sync stores with Supabase when authenticated (handles page refresh).
-    // In demo mode, auth is Zustand-only — skip Supabase session checks.
     useEffect(() => {
         if (!mounted || !isAuthenticated || USE_DEMO_MODE) return;
 

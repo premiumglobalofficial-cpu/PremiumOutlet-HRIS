@@ -16,7 +16,10 @@ function normalizeModuleFlags(value: unknown): ModuleFlags {
 
 export async function fetchModuleFlags(): Promise<ModuleFlags | null> {
   try {
-    const response = await fetch("/api/settings/appearance", { cache: "no-store" });
+    const response = await fetch("/api/settings/appearance", {
+      cache: "no-store",
+      credentials: "include",
+    });
     if (!response.ok) return null;
 
     const payload = (await response.json()) as { modules?: unknown; module_flags?: unknown };
@@ -30,6 +33,7 @@ export async function saveModuleFlags(modules: ModuleFlags): Promise<{ ok: boole
   try {
     const response = await fetch("/api/settings/appearance", {
       method: "PATCH",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ modules }),
     });

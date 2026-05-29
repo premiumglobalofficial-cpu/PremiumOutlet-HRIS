@@ -185,12 +185,15 @@ non_cash =
 - [x] `buildMonthlySaPayout()` — aggregates 4 computations
 - [x] `toPayrollAllowances()` — map approved cash components for payslip issue
 
-### Phase 2 — Database & API
+### Phase 2 — Database & API (in progress)
 
-- Migration: `sa_monthly_cycles`, `sa_compliance_weeks`, `sa_ot_approvals`, `sa_sales_records`, `sa_kpi_entries`, `sa_payouts`
-- RLS by branch + role
-- API routes: compliance CRUD, OT approve, COO sales entry, approve payout, HR export CSV
-- Wire `issuePayslip` to pull approved `sa_payouts` for period
+- [x] Migration `062_sa_commission.sql` — `sa_employee_profiles`, `sa_monthly_cycles`, `sa_payouts`, `sa_compliance_weeks`, `sa_ot_approvals` + RLS
+- [x] API `GET/PUT /api/sa-commission/cycles` — sync cycles to Supabase
+- [x] Compliance & KPI entry UI on SA Incentives panel
+- [x] Wire `issuePayslip` → approved SA incentives via `getApprovedSaIncentiveAllowances()`
+- [ ] Dedicated OT approval UI (`sa_ot_approvals` table)
+- [ ] Weekly compliance per-week UI (`sa_compliance_weeks`)
+- [ ] SA employee self-service view
 
 ### Phase 3 — Reports (6 outputs from brief)
 

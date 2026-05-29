@@ -15,6 +15,7 @@ import Image from "next/image";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { DEMO_USERS } from "@/data/seed";
+import { syncDemoSessionCookie } from "@/services/demo-session.client";
 
 // Set to true to use local demo login (no Supabase required)
 const USE_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
@@ -128,9 +129,14 @@ export default function LoginPage() {
         }
         const success = localLogin(loginEmail, loginPassword);
         if (success) {
+            const user = useAuthStore.getState().currentUser;
+            void syncDemoSessionCookie({
+                id: user.id,
+                role: user.role,
+                email: user.email,
+            });
             toast.success("Welcome back!");
-            const role = useAuthStore.getState().currentUser.role;
-            router.push(`/${role}/dashboard`);
+            router.push(`/${user.role}/dashboard`);
         } else {
             toast.error("Invalid email or password");
         }
