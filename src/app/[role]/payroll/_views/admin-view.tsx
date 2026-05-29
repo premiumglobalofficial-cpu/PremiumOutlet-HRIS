@@ -53,6 +53,10 @@ import { useDepartmentsStore } from "@/store/departments.store";
 import { useProjectsStore } from "@/store/projects.store";
 import { ThirteenthMonthModal } from "@/components/payroll/thirteenth-month-modal";
 import { SaCommissionPanel } from "@/components/payroll/sa-commission-panel";
+import {
+    BulkPayrollSaIncentives,
+    buildSaIncentivePreviewMap,
+} from "@/components/payroll/bulk-payroll-sa-incentives";
 import { useSaCommissionStore } from "@/store/sa-commission.store";
 import { getApprovedSaIncentiveAllowances, resolvePayrollOvertimeForSa } from "@/lib/sa-payroll-bridge";
 import { persistSaCycle } from "@/services/sa-commission.service";
@@ -268,6 +272,8 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
     const last12Months = useMemo(() => Array.from({ length: 12 }, (_, i) => format(subMonths(new Date(), i), "yyyy-MM")), []);
     const activeEmployees = useMemo(() => employees.filter((e) => e.status === "active"), [employees]);
     const [empSearchTerm, setEmpSearchTerm] = useState("");
+    const [includeSaIncentives, setIncludeSaIncentives] = useState(true);
+    const [payrollTab, setPayrollTab] = useState("payroll");
     const filteredActiveEmployees = useMemo(() => {
         if (!empSearchTerm.trim()) return activeEmployees;
         const q = empSearchTerm.toLowerCase();
@@ -368,6 +374,23 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
     };
     const toggleEmployee = (empId: string) => { setSelectedEmployeeIds((prev) => prev.includes(empId) ? prev.filter((id) => id !== empId) : [...prev, empId]); };
 
+    const approvedSaPayouts = useMemo(
+        () => getApprovedSaPayouts(selectedMonth),
+        [getApprovedSaPayouts, selectedMonth],
+    );
+    const saIncentivePreviewMap = useMemo(
+        () => buildSaIncentivePreviewMap(approvedSaPayouts, selectedMonth),
+        [approvedSaPayouts, selectedMonth],
+    );
+    const selectedMonthLabel = useMemo(
+        () => format(new Date(`${selectedMonth}-01`), "MMMM yyyy"),
+        [selectedMonth],
+    );
+    const getEmpNameById = useCallback(
+        (id: string) => employees.find((e) => e.id === id)?.name ?? id,
+        [employees],
+    );
+
     // Compute whether gov deductions will apply for the currently selected cutoff
     const govDeductionsSkipped = useMemo(() => {
         if (paySchedule.defaultFrequency !== "semi_monthly") return false;
@@ -411,7 +434,6 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
             let skippedDuplicates = 0;
             let zeroNetPayCount = 0;
             const saPayMonth = selectedMonth;
-            const approvedSaPayouts = getApprovedSaPayouts(saPayMonth);
             const saProcessedIds: string[] = [];
 
             selectedEmployeeIds.forEach((empId) => {
@@ -466,12 +488,14 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                 const empLoanDeduction = Math.min(rawLoanDeduction, Math.round(effectiveGrossPay * 0.30));
                 totalLoanDeductions += empLoanDeduction;
 
-                const { amount: saIncentive, note: saNote } = getApprovedSaIncentiveAllowances(
-                    approvedSaPayouts,
-                    saPayMonth,
-                    empId,
-                );
-                if (saIncentive > 0) saProcessedIds.push(empId);
+                let saIncentive = 0;
+                let saNote = "";
+                if (includeSaIncentives) {
+                    const sa = getApprovedSaIncentiveAllowances(approvedSaPayouts, saPayMonth, empId);
+                    saIncentive = sa.amount;
+                    saNote = sa.note;
+                    if (saIncentive > 0) saProcessedIds.push(empId);
+                }
 
                 const allowances = allowancesVal + saIncentive;
                 const otherDed = otherDedVal;
@@ -683,7 +707,7 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
             if (zeroNetPayCount > 0) toast.warning(`${zeroNetPayCount} employee${zeroNetPayCount > 1 ? "s" : ""} issued with ₱0 net pay — review deductions before locking.`);
             if (successCount > 0) toast.success(`Issued ${successCount} payslip${successCount > 1 ? "s" : ""}${loanMsg}`);
             else if (skippedDuplicates > 0) toast.info("No new payslips issued — all selected employees already have payslips for this period.");
-            setOpen(false); setSelectedEmployeeIds([]); setFormAllowances("0"); setFormOtherDeductions("0"); setFormOTHours("0"); setFormNightDiffHours("0"); setFormNotes(""); setFormIssuedAt(format(new Date(), "yyyy-MM-dd")); setFormPeriodEnd(computeSmartPeriodEnd(naturalBounds)); setEmpSearchTerm(""); setGrossOverrides({}); setExpandedOverrideEmpId(null);
+            setOpen(false); setSelectedEmployeeIds([]); setFormAllowances("0"); setFormOtherDeductions("0"); setFormOTHours("0"); setFormNightDiffHours("0"); setFormNotes(""); setFormIssuedAt(format(new Date(), "yyyy-MM-dd")); setFormPeriodEnd(computeSmartPeriodEnd(naturalBounds)); setEmpSearchTerm(""); setGrossOverrides({}); setExpandedOverrideEmpId(null); setIncludeSaIncentives(true);
         } catch (err) {
             toast.error(`Payslip issuance failed: ${err instanceof Error ? err.message : "Unknown error"}`);
         }
@@ -1048,7 +1072,21 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                                                 <div><label className="text-xs text-muted-foreground">OT Hours (125%)</label><Input type="number" min={0} step="0.5" value={formOTHours} onChange={(e) => setFormOTHours(e.target.value)} className="mt-1 h-8 text-xs" placeholder="0" /></div>
                                                 <div><label className="text-xs text-muted-foreground">Night Diff (+10%)</label><Input type="number" min={0} step="0.5" value={formNightDiffHours} onChange={(e) => setFormNightDiffHours(e.target.value)} className="mt-1 h-8 text-xs" placeholder="0" /></div>
                                             </div>
+                                            {includeSaIncentives && saIncentivePreviewMap.size > 0 && (
+                                                <p className="text-[10px] text-blue-700/90 dark:text-blue-300/90 mt-2 leading-relaxed">
+                                                    SA associates with approved incentives use OT from the SA engine — wizard OT hours are skipped for them to avoid double pay.
+                                                </p>
+                                            )}
                                         </div>
+                                        <BulkPayrollSaIncentives
+                                            month={selectedMonth}
+                                            monthLabel={selectedMonthLabel}
+                                            enabled={includeSaIncentives}
+                                            onEnabledChange={setIncludeSaIncentives}
+                                            payouts={approvedSaPayouts}
+                                            selectedEmployeeIds={selectedEmployeeIds}
+                                            getEmployeeName={getEmpNameById}
+                                        />
                                         {/* Gov't Deduction Quick Controls */}
                                         <div className="border border-border/60 rounded-lg p-3 bg-muted/30">
                                             <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
@@ -1084,6 +1122,11 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                                                         <strong>Auto-computed per employee:</strong><br />
                                                         • Gross from salary &middot; Gov&apos;t deductions &middot; Loans<br />
                                                         • Holiday pay (DOLE) &middot; OT 125% &middot; Night Diff +10%
+                                                        {includeSaIncentives && saIncentivePreviewMap.size > 0 && (
+                                                            <span className="block mt-1 text-violet-700 dark:text-violet-300">
+                                                                • SA incentives (approved) added to allowances
+                                                            </span>
+                                                        )}
                                                         {holidays.filter(h => h.date >= cutoffDates.start && h.date <= cutoffDates.end).length > 0 && (
                                                             <span className="block mt-1 font-semibold text-amber-700 dark:text-amber-400">
                                                                 {holidays.filter(h => h.date >= cutoffDates.start && h.date <= cutoffDates.end).length} holiday(s) in this period
@@ -1131,14 +1174,16 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                                                         const alreadyIssued = !!alreadyIssuedSlip;
                                                         const overrideActive = !!(grossOverrides[emp.id] && Number(grossOverrides[emp.id]) > 0);
                                                         const isExpanded = expandedOverrideEmpId === emp.id;
+                                                        const saPreview = includeSaIncentives ? saIncentivePreviewMap.get(emp.id) : undefined;
                                                         return (
-                                                            <div key={emp.id} className={`rounded-lg border transition-colors ${alreadyIssued ? "opacity-50 cursor-not-allowed bg-muted/30 border-transparent" : overrideActive ? "border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/20" : "border-transparent hover:bg-muted/50 hover:border-border/50"}`}>
+                                                            <div key={emp.id} className={`rounded-lg border transition-colors ${alreadyIssued ? "opacity-50 cursor-not-allowed bg-muted/30 border-transparent" : saPreview ? "border-violet-300/50 bg-violet-50/30 dark:bg-violet-950/15" : overrideActive ? "border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/20" : "border-transparent hover:bg-muted/50 hover:border-border/50"}`}>
                                                                 <div onClick={() => !alreadyIssued && toggleEmployee(emp.id)} className={`flex items-center gap-3 p-2 ${alreadyIssued ? "cursor-not-allowed" : "cursor-pointer"}`}>
                                                                     <Checkbox checked={selectedEmployeeIds.includes(emp.id)} onCheckedChange={() => !alreadyIssued && toggleEmployee(emp.id)} disabled={alreadyIssued} />
                                                                     <div className="flex-1 min-w-0">
-                                                                        <p className="text-sm font-medium">{emp.name}{alreadyIssuedSlip && <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 font-normal">✓ Issued ({alreadyIssuedSlip.status})</span>}{overrideActive && <span className="ml-2 text-xs text-amber-700 dark:text-amber-400 font-semibold">⚡ Gross override</span>}</p>
+                                                                        <p className="text-sm font-medium">{emp.name}{alreadyIssuedSlip && <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 font-normal">✓ Issued ({alreadyIssuedSlip.status})</span>}{overrideActive && <span className="ml-2 text-xs text-amber-700 dark:text-amber-400 font-semibold">⚡ Gross override</span>}{saPreview && <span className="ml-2 text-xs text-violet-700 dark:text-violet-300 font-semibold">✦ SA approved</span>}</p>
                                                                         <p className="text-xs text-muted-foreground">{emp.role} • {emp.department} • {formatCurrency(emp.salary)}/mo</p>
                                                                     </div>
+                                                                    <div className="flex flex-col items-end gap-0.5 shrink-0">
                                                                     <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded whitespace-nowrap">
                                                                         {overrideActive ? formatCurrency(Number(grossOverrides[emp.id])) : (() => {
                                                                             const f = emp.payFrequency || paySchedule.defaultFrequency;
@@ -1148,6 +1193,12 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                                                                             return `${formatCurrency(emp.salary)}/mo`;
                                                                         })()}
                                                                     </span>
+                                                                    {saPreview && (
+                                                                        <span className="text-[10px] font-semibold font-mono text-violet-700 dark:text-violet-300 whitespace-nowrap">
+                                                                            +{formatCurrency(saPreview.amount)} SA
+                                                                        </span>
+                                                                    )}
+                                                                    </div>
                                                                     {!alreadyIssued && (
                                                                         <button
                                                                             type="button"
@@ -1190,7 +1241,7 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
             </div>
 
             {/* Tabs */}
-            <Tabs defaultValue="payroll">
+            <Tabs value={payrollTab} onValueChange={setPayrollTab}>
                 <TabsList className="w-full justify-start">
                     <TabsTrigger value="payroll" className="gap-1.5"><CreditCard className="h-3.5 w-3.5" /> Payroll</TabsTrigger>
                     {canIssue && <TabsTrigger value="deductions" className="gap-1.5"><Calculator className="h-3.5 w-3.5" /> Deduction/Allowance</TabsTrigger>}
