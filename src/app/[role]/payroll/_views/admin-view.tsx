@@ -52,6 +52,7 @@ import { PH_EXEMPTION_REASONS } from "@/types";
 import { useDepartmentsStore } from "@/store/departments.store";
 import { useProjectsStore } from "@/store/projects.store";
 import { ThirteenthMonthModal } from "@/components/payroll/thirteenth-month-modal";
+import { SaCommissionPanel } from "@/components/payroll/sa-commission-panel";
 import { ExportBackupDialog } from "@/components/export-backup-dialog";
 import { ImportDataDialog } from "@/components/import-data-dialog";
 import PayrollPaymentWizard, { type WizardStep, usePayrollProgress } from "@/features/payroll-payment/payroll-payment-wizard";
@@ -1162,6 +1163,7 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                     {canIssue && <TabsTrigger value="settings" className="gap-1.5"><Settings className="h-3.5 w-3.5" /> Pay Schedule</TabsTrigger>}
                     {canIssue && <TabsTrigger value="tax-settings" className="gap-1.5"><Percent className="h-3.5 w-3.5" /> Tax Settings</TabsTrigger>}
                     {canIssue && <TabsTrigger value="gov-reports" className="gap-1.5"><Building2 className="h-3.5 w-3.5" /> Gov Reports</TabsTrigger>}
+                    {canIssue && <TabsTrigger value="sa-incentives" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" /> SA Incentives</TabsTrigger>}
                 </TabsList>
 
                 {/* ═══ Unified Payroll Tab — 2-column layout ═══ */}
@@ -2850,6 +2852,12 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                             availablePeriods={last12Months}
                         />
                     </TabsContent>
+
+                    {canIssue && (
+                        <TabsContent value="sa-incentives" className="mt-4">
+                            <SaCommissionPanel />
+                        </TabsContent>
+                    )}
                 )}
             </Tabs>
 

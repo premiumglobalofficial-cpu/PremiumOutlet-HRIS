@@ -1,3 +1,9 @@
+import type {
+  SaComplianceDeducted,
+  SaComplianceEarned,
+  SaMonthlyPayoutBreakdown,
+} from "@/lib/sa-commission";
+
 // ─── Core Types ──────────────────────────────────────────────
 
 export type Role = "admin" | "hr" | "finance" | "employee" | "supervisor" | "payroll_admin" | "auditor";
@@ -203,6 +209,63 @@ export interface PayScheduleConfig {
   autoDeductUndertime: boolean;     // auto-compute undertime (shift_hours - actual_hours) deduction
   autoAddOvertime: boolean;         // auto-add approved OT hours to payslip earnings
   workDaysPerMonth: number;         // for daily_rate = monthly_salary / workDaysPerMonth (default 22)
+}
+
+// ─── SA Commission (POGRC Dev Brief) ───────────────────────────
+
+export type SaEmploymentType = "trainee" | "probationary" | "regular" | "oic";
+export type SaOtType = "cash" | "offset";
+export type SaComplianceTier = "GOLD" | "SILVER" | "BRONZE" | "NI";
+export type SaPayoutStatus = "draft" | "approved" | "processed";
+
+export interface SaEmployeeProfile {
+  employeeId: string;
+  branchId: string;
+  employmentType: SaEmploymentType;
+  isSalesAssociate: boolean;
+}
+
+export interface SaOtApproval {
+  id: string;
+  employeeId: string;
+  date: string;
+  hours: number;
+  otType: SaOtType;
+  status: "pending" | "approved" | "rejected";
+  approvedBy?: string;
+  approvedAt?: string;
+}
+
+export interface SaMonthlyCycle {
+  id: string;
+  month: string;
+  branchId: string;
+  branchTotalSales: number;
+  complianceEarned: Record<string, SaComplianceEarned>;
+  complianceDeducted: Record<string, SaComplianceDeducted>;
+  salesByEmployee: Record<string, number>;
+  otHoursByEmployee: Record<string, number[]>;
+  kpiByEmployee: Record<string, {
+    unitsSold: number;
+    revenue: number;
+    upsells: number;
+    commendations: number;
+    complaints: number;
+    shiftsWorked: number;
+  }>;
+  payouts: SaPayoutRecord[];
+  updatedAt: string;
+}
+
+export interface SaPayoutRecord {
+  id: string;
+  employeeId: string;
+  month: string;
+  branchId: string;
+  status: SaPayoutStatus;
+  breakdown: SaMonthlyPayoutBreakdown;
+  approvedBy?: string;
+  approvedAt?: string;
 }
 
 // ─── Payroll Signature Configuration ─────────────────────────
