@@ -14,8 +14,32 @@ function isAuthError(error: unknown): boolean {
     err.code === "refresh_token_not_found" ||
     err.message?.includes("Refresh Token") ||
     err.message?.includes("Invalid Refresh Token") ||
+    err.message?.includes("Auth session missing") ||
     err.message?.includes("AuthApiError")
   );
+}
+
+/** Stale or empty cookie sessions — safe to clear and treat as logged out. */
+function isStaleSessionError(error: unknown): boolean {
+  if (!error) return false;
+  const err = error as { code?: string; message?: string };
+  return Boolean(
+    err.code === "refresh_token_not_found" ||
+    err.message?.includes("Refresh Token") ||
+    err.message?.includes("Invalid Refresh Token") ||
+    err.message?.includes("Auth session missing")
+  );
+}
+
+function clearSupabaseAuthCookies(
+  request: NextRequest,
+  response: NextResponse
+): void {
+  for (const cookie of request.cookies.getAll()) {
+    if (cookie.name.startsWith("sb-")) {
+      response.cookies.delete(cookie.name);
+    }
+  }
 }
 
 // Suppress auth errors from polluting server logs.
@@ -43,11 +67,12 @@ export async function proxy(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
+  // Demo mode uses Zustand-only auth — never block routes on Supabase cookies.
+  if (isDemoMode) {
+    return supabaseResponse;
+  }
+
   if (!supabaseUrl || !supabaseAnonKey) {
-    if (isDemoMode) {
-      // In demo mode, skip Supabase auth — client-side Zustand handles it
-      return supabaseResponse;
-    }
     // In production, missing env vars means we can't authenticate — block access
     const isPublicPath = ["/login", "/kiosk"].some(
       (p) => request.nextUrl.pathname === p || request.nextUrl.pathname.startsWith(p + "/")
@@ -117,21 +142,12 @@ export async function proxy(request: NextRequest) {
     
     // Handle refresh token errors explicitly
     if (error) {
-      const isRefreshTokenError = 
-        error.code === "refresh_token_not_found" ||
-        error.message?.includes("Refresh Token") ||
-        error.message?.includes("Invalid Refresh Token");
-      
-      if (isRefreshTokenError) {
-        // Silently clear cookies - this is expected for expired sessions
-        for (const cookie of request.cookies.getAll()) {
-          if (cookie.name.startsWith("sb-")) {
-            supabaseResponse.cookies.delete(cookie.name);
-          }
-        }
+      if (isStaleSessionError(error)) {
+        // Silently clear cookies — expected for expired or empty sessions
+        clearSupabaseAuthCookies(request, supabaseResponse);
         user = null;
       } else {
-        // Log other auth errors but treat as unauthenticated
+        // Log unexpected auth errors but treat as unauthenticated
         console.warn("[proxy] Auth error:", error.message);
         user = null;
       }
@@ -151,19 +167,8 @@ export async function proxy(request: NextRequest) {
     
     // Check if thrown error is a refresh token error (by code or message)
     const errObj = err as { code?: string; message?: string };
-    const isRefreshTokenError =
-      errObj.code === "refresh_token_not_found" ||
-      errObj.message?.includes("Refresh Token") || 
-      errObj.message?.includes("refresh_token_not_found") ||
-      errObj.message?.includes("Invalid Refresh Token");
-    
-    if (isAuthError || isRefreshTokenError) {
-      // Silently clear cookies - this is expected for expired sessions
-      for (const cookie of request.cookies.getAll()) {
-        if (cookie.name.startsWith("sb-")) {
-          supabaseResponse.cookies.delete(cookie.name);
-        }
-      }
+    if (isAuthError || isStaleSessionError(err)) {
+      clearSupabaseAuthCookies(request, supabaseResponse);
     } else if (!isNetworkError) {
       console.error("[proxy] Unexpected auth error:", err);
     }

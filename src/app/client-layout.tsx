@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { KeyRound, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-const USE_DEMO_MODE = process.env.NEXT_PUBLIC_USE_DEMO_MODE === "true";
+const USE_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
 function AppLoadingScreen() {
     return (
@@ -213,9 +213,9 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     }, [isAuthenticated, mounted, employees, currentUser, pathname]);
 
     // Sync stores with Supabase when authenticated (handles page refresh).
-    // Also listens for Supabase auth events to handle invalid/expired tokens.
+    // In demo mode, auth is Zustand-only — skip Supabase session checks.
     useEffect(() => {
-        if (!mounted || !isAuthenticated) return;
+        if (!mounted || !isAuthenticated || USE_DEMO_MODE) return;
 
         const supabase = createClient();
 
