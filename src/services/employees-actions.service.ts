@@ -37,16 +37,37 @@ export async function addEmployee(emp: Employee): Promise<{ ok: boolean; error?:
 }
 
 /**
- * Update an employee — DB-first.
+ * Update an employee — API-first (bypasses RLS via server-side admin client).
  */
 export async function updateEmployee(id: string, patch: Partial<Employee>): Promise<boolean> {
-    const ok = await employeesDb.update(id, patch);
-    if (!ok) return false;
+    try {
+        const res = await fetch(`/api/employees/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+        });
 
-    useEmployeesStore.setState((s) => ({
-        employees: s.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-    }));
-    return true;
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: "Unknown error" }));
+            console.error("[employees] update failed:", err.error);
+            return false;
+        }
+
+        useEmployeesStore.setState((s) => ({
+            employees: s.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+        }));
+        return true;
+    } catch (err) {
+        console.error("[employees] update error:", err);
+        // Fallback to direct DB call (for offline/dev scenarios)
+        const ok = await employeesDb.update(id, patch);
+        if (!ok) return false;
+
+        useEmployeesStore.setState((s) => ({
+            employees: s.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+        }));
+        return true;
+    }
 }
 
 /**

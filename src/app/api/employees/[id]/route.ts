@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient, createServerSupabaseClient } from "@/services/supabase-server";
+import { keysToSnake } from "@/lib/db-utils";
 
 export const runtime = "nodejs";
 
@@ -29,6 +30,67 @@ async function deleteIn(
   const { error } = await admin.from(table).delete().in(column, values);
   if (error && error.code !== "42P01") {
     throw new Error(`${table}: ${error.message}`);
+  }
+}
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    if (!id) {
+      return NextResponse.json({ ok: false, error: "Missing employee id" }, { status: 400 });
+    }
+
+    const serverSupabase = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await serverSupabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const admin = await createAdminSupabaseClient();
+
+    // Verify actor is admin or HR
+    const { data: actor, error: actorError } = await admin
+      .from("employees")
+      .select("id, role")
+      .or(`profile_id.eq.${user.id},email.eq.${user.email ?? ""}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (actorError) {
+      console.error("[employees/patch] actor lookup:", actorError.message);
+      return NextResponse.json({ ok: false, error: "Actor lookup failed" }, { status: 500 });
+    }
+
+    const actorRole = String(actor?.role || "").toLowerCase();
+    if (!["admin", "hr"].includes(actorRole)) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await request.json();
+
+    // Convert camelCase keys to snake_case for DB
+    const row = keysToSnake(body as Record<string, unknown>);
+
+    // Use admin client to bypass RLS
+    const { data, error } = await admin
+      .from("employees")
+      .update(row)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[employees/patch] update:", error.message);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, data }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    console.error("[employees/patch] error:", error);
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Employee update failed" },
+      { status: 500 }
+    );
   }
 }
 
