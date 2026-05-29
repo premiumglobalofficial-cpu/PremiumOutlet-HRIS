@@ -77,13 +77,13 @@ export async function getApiAuthContext(
 ): Promise<ApiAuthContext | null> {
   const { requireAdmin = false } = options;
   const supabase = await createServerSupabaseClient();
-  const adminDb = await createAdminSupabaseClient();
 
   const user = await resolveSupabaseUser(supabase);
   if (user) {
     const role = await resolveUserRole(supabase, user.id);
     if (!role) return null;
     if (requireAdmin && !ADMIN_ROLES.has(role)) return null;
+    const adminDb = await createAdminSupabaseClient();
     return { userId: user.id, role, supabase, adminDb, demoMode: false };
   }
 
@@ -91,6 +91,7 @@ export async function getApiAuthContext(
     const demoSession = await readDemoSession();
     if (demoSession) {
       if (requireAdmin && !ADMIN_ROLES.has(demoSession.role)) return null;
+      const adminDb = await createAdminSupabaseClient();
       return {
         userId: demoSession.userId,
         role: demoSession.role,

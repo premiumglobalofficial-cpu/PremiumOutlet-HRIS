@@ -16,6 +16,7 @@
 import { NextResponse } from "next/server";
 import { getApiAuthContext } from "@/lib/api-auth";
 import { hasPermissionServer } from "@/lib/permissions-server";
+import { adminDbErrorHint } from "@/lib/supabase-admin";
 
 interface ReconcileResult {
   employeeId: string;
@@ -59,15 +60,18 @@ export async function POST(req: Request) {
   // 1. Get all active employees with their work_days
   const { data: employees, error: empErr } = await db
     .from("employees")
-    .select("id, name, join_date, status")
+    .select("id, name, join_date, status, work_days")
     .eq("status", "active");
 
   if (empErr) {
     console.error("[reconcile-absences] Failed to fetch employees:", empErr);
+    const hint = adminDbErrorHint(empErr.message);
     return NextResponse.json(
       {
-        error: "Failed to fetch employees",
-        ...(process.env.NODE_ENV === "development" ? { details: empErr.message } : {}),
+        error: hint ?? "Failed to fetch employees",
+        ...(process.env.NODE_ENV === "development" || hint
+          ? { details: empErr.message }
+          : {}),
       },
       { status: 500 }
     );

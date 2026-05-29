@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiAuthContext } from "@/lib/api-auth";
 import { employeeToDb } from "@/lib/employee-db";
 import { hasPermissionServer } from "@/lib/permissions-server";
+import { adminDbErrorHint } from "@/lib/supabase-admin";
 import { createAdminSupabaseClient } from "@/services/supabase-server";
 import type { Employee } from "@/types";
 
@@ -58,7 +59,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { error } = await ctx.adminDb.from("employees").update(row).eq("id", id);
     if (error) {
       console.error("[employees] PATCH:", error.message);
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      const hint = adminDbErrorHint(error.message);
+      return NextResponse.json(
+        { ok: false, error: hint ?? error.message, ...(hint ? { details: error.message } : {}) },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ ok: true, id });

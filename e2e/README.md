@@ -48,7 +48,7 @@ The repo includes `.cursor/mcp.json` for the official [@playwright/mcp](https://
 
 ## Database note
 
-Some API routes use the Supabase **service role** (`SUPABASE_SERVICE_ROLE_KEY`). If reconcile or employee writes return `permission denied for table employees`, grant access in Supabase SQL or confirm the service role key matches your project dashboard.
+Some API routes use the Supabase **service role** (`SUPABASE_SERVICE_ROLE_KEY`). If reconcile or employee writes return `permission denied for table employees`, run `supabase/migrations/063_service_role_grants.sql` in the Supabase SQL Editor (already applied on the linked project via migration `service_role_grants`), and confirm Vercel uses the **service_role** secret—not the anon key. See `.env.example` for required variables.
 
 ## CI
 

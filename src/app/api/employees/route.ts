@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getApiAuthContext } from "@/lib/api-auth";
 import { employeeToDb } from "@/lib/employee-db";
 import { hasPermissionServer } from "@/lib/permissions-server";
+import { adminDbErrorHint } from "@/lib/supabase-admin";
 import type { Employee } from "@/types";
 
 export const runtime = "nodejs";
@@ -49,7 +50,11 @@ export async function POST(request: Request) {
     const { error } = await ctx.adminDb.from("employees").upsert(row, { onConflict: "id" });
     if (error) {
       console.error("[employees] upsert:", error.message);
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      const hint = adminDbErrorHint(error.message);
+      return NextResponse.json(
+        { ok: false, error: hint ?? error.message, ...(hint ? { details: error.message } : {}) },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ ok: true, id: body.id });
