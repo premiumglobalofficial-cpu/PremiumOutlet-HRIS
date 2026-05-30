@@ -254,6 +254,8 @@ export interface SaMonthlyCycle {
     shiftsWorked: number;
   }>;
   payouts: SaPayoutRecord[];
+  /** 4-week earn checkbox grid per employee (OIC weekly tracking) */
+  complianceWeeksByEmployee?: Record<string, import("@/lib/sa-compliance-weeks").SaWeekEarnGrid>;
   updatedAt: string;
 }
 

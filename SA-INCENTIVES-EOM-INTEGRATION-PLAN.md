@@ -33,10 +33,10 @@
 | Bulk payroll SA preview | — | ✅ Toggle + totals | Wire EOM gate |
 | Payslip bridge | Approved → allowances | ✅ `getApprovedSaIncentiveAllowances` | EOM gate |
 | Max cash (excl. store goal) | Base + variable ≤ ₱21,452.50 | ❌ | **MVP-2** warn in UI |
-| Weekly compliance entry | Per week × 4 | Partial (monthly aggregate) | Phase 2 |
+| Weekly compliance entry | Per week × 4 | Partial (monthly aggregate) | **Done** — 4-week grid + DB jsonb |
 | OT approval + cash/offset | Pre-approved log | Partial (hours array) | Phase 2 |
-| Non-cash GC/rice tracking | Separate from cash payroll | Notes + CSV export | Phase 2 |
-| SA self-service view | Read-only own payout | ❌ | Phase 2 |
+| Non-cash GC/rice tracking | Separate from cash payroll | Notes + CSV export | **Done** |
+| SA self-service view | Read-only own payout | ❌ | **Done** — My Payslips tab |
 | POS import | Validation | ❌ | Phase 4 |
 
 ---
@@ -108,9 +108,9 @@ npm test -- sa-eom sa-payroll-bridge sa-commission
 
 | Task | Detail |
 |------|--------|
-| Variable cap warning | If commission+OT+compliance cash > ₱6,112.50, show amber banner (excludes store goal) |
-| Payslip line items | Optional `lineItemsJson` rows: Sales / OT / Compliance / Store Goal |
-| EOM lock flag | After `processed`, block edits unless admin override |
+| Variable cap warning | If commission+OT+compliance cash > ₱6,112.50, show amber banner (excludes store goal) | **Done** |
+| Payslip line items | Optional `lineItemsJson` rows: Sales / OT / Compliance / Store Goal | Phase 2 |
+| EOM lock flag | After `processed`, block edits unless admin override | **Done** — approved/processed lock + revert |
 
 ### Phase 2 — Operational UI (from implementation plan)
 

@@ -12,7 +12,13 @@ import {
   type SaComplianceEarned,
   type SaEmploymentType,
 } from "@/lib/sa-commission";
-import type { SaEmployeeProfile, SaMonthlyCycle, SaPayoutRecord, SaPayoutStatus } from "@/types";
+import type { SaWeekEarnGrid } from "@/lib/sa-compliance-weeks";
+import type {
+  SaEmployeeProfile,
+  SaMonthlyCycle,
+  SaPayoutRecord,
+  SaPayoutStatus,
+} from "@/types";
 
 interface SaCommissionState {
   profiles: SaEmployeeProfile[];
@@ -28,6 +34,7 @@ interface SaCommissionState {
     employeeId: string,
     earned: SaComplianceEarned,
     deducted: SaComplianceDeducted,
+    weekGrid?: SaWeekEarnGrid,
   ) => void;
   setEmployeeKpi: (
     month: string,
@@ -47,6 +54,7 @@ interface SaCommissionState {
   getPayoutForEmployee: (month: string, employeeId: string) => SaPayoutRecord | undefined;
   replaceCycle: (cycle: SaMonthlyCycle) => void;
   markPayoutsProcessed: (month: string, employeeIds: string[]) => void;
+  revertPayoutToDraft: (payoutId: string) => void;
 }
 
 function cycleKey(month: string, branchId: string) {
@@ -112,6 +120,7 @@ export const useSaCommissionStore = create<SaCommissionState>()(
           branchTotalSales: 0,
           complianceEarned: {},
           complianceDeducted: {},
+          complianceWeeksByEmployee: {},
           salesByEmployee: {},
           otHoursByEmployee: {},
           kpiByEmployee: {},
@@ -150,7 +159,7 @@ export const useSaCommissionStore = create<SaCommissionState>()(
         get().recomputePayouts(month, branchId);
       },
 
-      setCompliance: (month, branchId, employeeId, earned, deducted) => {
+      setCompliance: (month, branchId, employeeId, earned, deducted, weekGrid) => {
         get().getOrCreateCycle(month, branchId);
         set((s) => ({
           cycles: s.cycles.map((c) =>
@@ -159,6 +168,9 @@ export const useSaCommissionStore = create<SaCommissionState>()(
                   ...c,
                   complianceEarned: { ...c.complianceEarned, [employeeId]: earned },
                   complianceDeducted: { ...c.complianceDeducted, [employeeId]: deducted },
+                  complianceWeeksByEmployee: weekGrid
+                    ? { ...(c.complianceWeeksByEmployee ?? {}), [employeeId]: weekGrid }
+                    : c.complianceWeeksByEmployee,
                   updatedAt: new Date().toISOString(),
                 }
               : c,
@@ -244,16 +256,19 @@ export const useSaCommissionStore = create<SaCommissionState>()(
               ? prev.status
               : "draft";
 
-          const breakdown = buildMonthlySaPayout({
-            employeeId: p.employeeId,
-            month,
-            employmentType: p.employmentType,
-            salesTotal: cycle.salesByEmployee[p.employeeId] ?? 0,
-            approvedOtHoursPerDay: cycle.otHoursByEmployee[p.employeeId] ?? [],
-            complianceEarned: cycle.complianceEarned[p.employeeId] ?? emptyEarned(),
-            complianceDeducted: cycle.complianceDeducted[p.employeeId] ?? emptyDeducted(),
-            storeGoalShare: goalShares.get(p.employeeId) ?? 0,
-          });
+          const breakdown =
+            (prev?.status === "approved" || prev?.status === "processed") && prev?.breakdown
+              ? prev.breakdown
+              : buildMonthlySaPayout({
+                  employeeId: p.employeeId,
+                  month,
+                  employmentType: p.employmentType,
+                  salesTotal: cycle.salesByEmployee[p.employeeId] ?? 0,
+                  approvedOtHoursPerDay: cycle.otHoursByEmployee[p.employeeId] ?? [],
+                  complianceEarned: cycle.complianceEarned[p.employeeId] ?? emptyEarned(),
+                  complianceDeducted: cycle.complianceDeducted[p.employeeId] ?? emptyDeducted(),
+                  storeGoalShare: goalShares.get(p.employeeId) ?? 0,
+                });
 
           return {
             id: prev?.id ?? `SAP-${nanoid(8)}`,
@@ -337,6 +352,25 @@ export const useSaCommissionStore = create<SaCommissionState>()(
                   updatedAt: now,
                 },
           ),
+        }));
+      },
+
+      revertPayoutToDraft: (payoutId) => {
+        set((s) => ({
+          cycles: s.cycles.map((c) => ({
+            ...c,
+            payouts: c.payouts.map((p) =>
+              p.id === payoutId && p.status !== "processed"
+                ? {
+                    ...p,
+                    status: "draft" as const,
+                    approvedBy: undefined,
+                    approvedAt: undefined,
+                  }
+                : p,
+            ),
+            updatedAt: new Date().toISOString(),
+          })),
         }));
       },
     }),

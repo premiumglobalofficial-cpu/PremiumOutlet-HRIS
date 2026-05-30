@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { CheckCircle, Download, Info, Sparkles, BookOpen, Settings2 } from "lucide-react";
-import { SA_EOM_BLOCKED_REASON } from "@/lib/sa-eom-policy";
+import { SA_EOM_BLOCKED_REASON, getSaVariableCapWarning } from "@/lib/sa-eom-policy";
 import { SaIncentivesReferenceTables } from "@/components/payroll/sa-incentives-reference-tables";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SaEmploymentType } from "@/types";
@@ -64,6 +64,7 @@ export function SaCommissionPanel() {
     recomputePayouts,
     getApprovedPayouts,
     replaceCycle,
+    revertPayoutToDraft,
   } = useSaCommissionStore();
 
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
@@ -161,6 +162,10 @@ export function SaCommissionPanel() {
     complaints: 0,
     shiftsWorked: 0,
   };
+  const complianceWeekGrid = cycle?.complianceWeeksByEmployee?.[complianceEmpId];
+  const complianceEmpPayout = cycle?.payouts.find((p) => p.employeeId === complianceEmpId);
+  const complianceLocked =
+    complianceEmpPayout?.status === "approved" || complianceEmpPayout?.status === "processed";
 
   const ensureProfiles = () => {
     for (const emp of branchEmployees) {
@@ -374,13 +379,15 @@ export function SaCommissionPanel() {
         onEmployeeChange={setComplianceEmpId}
         earned={complianceEarned}
         deducted={complianceDeducted}
+        weekGrid={complianceWeekGrid}
+        locked={complianceLocked}
         kpi={complianceKpi}
-        onSave={(earned, deducted, kpi) => {
+        onSave={(earned, deducted, kpi, weekGrid) => {
           const targetId = complianceEmpId;
           if (!targetId) return;
           ensureProfiles();
           getOrCreateCycle(month, branchId);
-          setCompliance(month, branchId, targetId, earned, deducted);
+          setCompliance(month, branchId, targetId, earned, deducted, weekGrid);
           setEmployeeKpi(month, branchId, targetId, kpi);
           recomputePayouts(month, branchId);
           void syncCycle();
@@ -427,10 +434,25 @@ export function SaCommissionPanel() {
                     profile?.employmentType ?? "regular";
                   const payout = cycle?.payouts.find((p) => p.employeeId === emp.id);
                   const b = payout?.breakdown;
+                  const isLocked =
+                    payout?.status === "approved" || payout?.status === "processed";
+                  const capWarning = b ? getSaVariableCapWarning(b) : null;
 
                   return (
-                    <TableRow key={emp.id}>
-                      <TableCell className="font-medium">{emp.name}</TableCell>
+                    <TableRow key={emp.id} className={capWarning ? "bg-amber-50/50 dark:bg-amber-950/15" : undefined}>
+                      <TableCell className="font-medium">
+                        {emp.name}
+                        {isLocked && (
+                          <Badge variant="outline" className="ml-2 text-[10px]">
+                            {payout?.status}
+                          </Badge>
+                        )}
+                        {capWarning && (
+                          <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5 max-w-[200px] leading-tight">
+                            ⚠ Cap exceeded
+                          </p>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Select
                           value={employmentType}
@@ -459,6 +481,7 @@ export function SaCommissionPanel() {
                         <Input
                           type="number"
                           className="w-[120px] h-8"
+                          disabled={isLocked}
                           value={cycle?.salesByEmployee[emp.id] ?? ""}
                           onChange={(e) => {
                             ensureProfiles();
@@ -476,6 +499,7 @@ export function SaCommissionPanel() {
                         <Input
                           className="w-[100px] h-8"
                           placeholder="2,1,0"
+                          disabled={isLocked}
                           defaultValue={(cycle?.otHoursByEmployee[emp.id] ?? []).join(",")}
                           onBlur={(e) => {
                             const hours = e.target.value
@@ -510,8 +534,24 @@ export function SaCommissionPanel() {
                         {formatCurrency(b ? toPayrollIncentiveAllowances(b) : 0)}
                       </TableCell>
                       <TableCell>
-                        {payout?.status === "approved" ? (
-                          <Badge>Approved</Badge>
+                        {payout?.status === "processed" ? (
+                          <Badge variant="default">Processed</Badge>
+                        ) : payout?.status === "approved" ? (
+                          <div className="flex flex-col gap-1">
+                            <Badge>Approved</Badge>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-[10px] px-2"
+                              onClick={() => {
+                                revertPayoutToDraft(payout.id);
+                                void syncCycle();
+                                toast.info(`Reverted ${emp.name} to draft`);
+                              }}
+                            >
+                              Revert to draft
+                            </Button>
+                          </div>
                         ) : (
                           <Button
                             size="sm"

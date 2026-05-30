@@ -10,6 +10,8 @@ function rowToCycle(row: Record<string, unknown>): SaMonthlyCycle {
     branchTotalSales: Number(row.branch_total_sales) || 0,
     complianceEarned: (row.compliance_earned as SaMonthlyCycle["complianceEarned"]) ?? {},
     complianceDeducted: (row.compliance_deducted as SaMonthlyCycle["complianceDeducted"]) ?? {},
+    complianceWeeksByEmployee:
+      (row.compliance_weeks_by_employee as SaMonthlyCycle["complianceWeeksByEmployee"]) ?? {},
     salesByEmployee: (row.sales_by_employee as SaMonthlyCycle["salesByEmployee"]) ?? {},
     otHoursByEmployee: (row.ot_hours_by_employee as SaMonthlyCycle["otHoursByEmployee"]) ?? {},
     kpiByEmployee: (row.kpi_by_employee as SaMonthlyCycle["kpiByEmployee"]) ?? {},
@@ -26,6 +28,7 @@ function cycleToRow(cycle: SaMonthlyCycle) {
     branch_total_sales: cycle.branchTotalSales,
     compliance_earned: cycle.complianceEarned,
     compliance_deducted: cycle.complianceDeducted,
+    compliance_weeks_by_employee: cycle.complianceWeeksByEmployee ?? {},
     sales_by_employee: cycle.salesByEmployee,
     ot_hours_by_employee: cycle.otHoursByEmployee,
     kpi_by_employee: cycle.kpiByEmployee,

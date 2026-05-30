@@ -5,7 +5,7 @@
  * end-of-month / 2nd semi-monthly cutoff. Mid-month runs pay base + statutory only.
  */
 
-import { SA_BASE_SALARY, SA_MAX_OT_HOURS_PER_MONTH, SA_OT_RATE } from "@/lib/sa-commission";
+import { SA_BASE_SALARY, SA_MAX_OT_HOURS_PER_MONTH, SA_OT_RATE, type SaMonthlyPayoutBreakdown } from "@/lib/sa-commission";
 import { round2 } from "@/lib/payroll-deductions";
 
 /** Max OT pay per month: 24h × ₱92.19 */
@@ -36,3 +36,16 @@ export function isSaIncentiveEligibleCutoff(
 
 export const SA_EOM_BLOCKED_REASON =
   "SA variable incentives apply on 2nd cutoff (EOM) only. Use 1st cutoff for base pay; approve SA payouts then run 2nd cutoff.";
+
+/** Variable cash excluding store goal — warn if over ₱6,112.50 cap */
+export function getSaVariableCashExclStoreGoal(b: SaMonthlyPayoutBreakdown): number {
+  return round2(b.salesCommission + b.otPay + b.complianceCash);
+}
+
+export function getSaVariableCapWarning(b: SaMonthlyPayoutBreakdown): string | null {
+  const variable = getSaVariableCashExclStoreGoal(b);
+  if (variable > SA_MAX_VARIABLE_CASH) {
+    return `Variable cash ₱${variable.toLocaleString()} exceeds cap ₱${SA_MAX_VARIABLE_CASH.toLocaleString()} (excludes store goal). Board review required.`;
+  }
+  return null;
+}
