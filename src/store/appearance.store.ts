@@ -196,10 +196,10 @@ export const DEFAULT_MODULE_FLAGS: ModuleFlags = {
   events: true,
   // ── Premium / unpaid features (off by default) ────────────────────────────
   jobs: false,
-  // ── Super-admin toggle features (off by default) ─────────────────────────
-  docs201: false,
-  documentCenter: false,
-  disciplinary: false,
+  // ── Document Center modules (enabled for POGRC HR) ───────────────────────
+  docs201: true,
+  documentCenter: true,
+  disciplinary: true,
   vbirAlphaList: false,
 };
 
