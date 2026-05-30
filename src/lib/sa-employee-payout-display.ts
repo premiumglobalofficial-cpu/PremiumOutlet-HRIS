@@ -2,6 +2,7 @@
  * Employee-facing SA incentive breakdown — "Full Picture" rows (Component / Amount / How).
  */
 
+import { format, parse } from "date-fns";
 import {
   SA_OT_RATE,
   SA_SALES_TARGET,
@@ -10,6 +11,7 @@ import {
   type SaMonthlyPayoutBreakdown,
   type SaSalesLevel,
 } from "@/lib/sa-commission";
+import { round2 } from "@/lib/payroll-deductions";
 import { formatCurrency } from "@/lib/format";
 
 export type SaFullPictureRow = {
@@ -30,8 +32,19 @@ function salesLevelLabel(level: SaSalesLevel): string {
   return level === "NOT_HIT" ? "NOT HIT" : level;
 }
 
-function formatSalesAmount(n: number): string {
-  return formatCurrency(n);
+export function formatSaMonthLabel(month: string): string {
+  try {
+    return format(parse(`${month}-01`, "yyyy-MM-dd", new Date()), "MMMM yyyy");
+  } catch {
+    return month;
+  }
+}
+
+/** Spec-aligned total: base + commission + OT + compliance cash + grocery GC (excludes rice & store goal). */
+export function buildSaDisplayCashTotal(b: SaMonthlyPayoutBreakdown): number {
+  return round2(
+    b.baseSalary + b.salesCommission + b.otPay + b.complianceCash + b.complianceGc,
+  );
 }
 
 /** Build Kim-style full picture table rows from an approved or draft breakdown. */
@@ -41,6 +54,7 @@ export function buildSaFullPictureRows(
 ): SaFullPictureRow[] {
   const level = salesLevelLabel(b.salesLevel);
   const pct = Math.round(b.achievementPct);
+  const displayTotal = buildSaDisplayCashTotal(b);
 
   const rows: SaFullPictureRow[] = [
     {
@@ -49,7 +63,7 @@ export function buildSaFullPictureRows(
       how: "Minimum wage. Fixed every month.",
     },
     {
-      component: `Sales Target Commission ${level} (${pct}%)`,
+      component: `Sales Target Commission  ${level} (${pct}%)`,
       amount: formatCurrency(b.salesCommission),
       how: `${formatCurrency(b.salesTotal)} ÷ ${formatCurrency(SA_SALES_TARGET)} = ${pct}%. ${level} tier.`,
       tone: b.salesCommission > 0 ? "incentive" : "default",
@@ -57,7 +71,7 @@ export function buildSaFullPictureRows(
     {
       component: `Overtime Pay — ${ctx.otHoursTotal} hrs total`,
       amount: formatCurrency(b.otPay),
-      how: `${ctx.otHoursTotal} hrs × ₱${SA_OT_RATE.toFixed(2)}. Taken as cash.`,
+      how: `${ctx.otHoursTotal} hrs x ₱${SA_OT_RATE.toFixed(2)}. Taken as cash.`,
       tone: b.otPay > 0 ? "incentive" : "default",
     },
     {
@@ -95,10 +109,10 @@ export function buildSaFullPictureRows(
     },
     {
       component: "TOTAL CASH + SALARY",
-      amount: formatCurrency(b.cashTotal),
-      how: ctx.storeGoalHit && b.storeGoalShare === 0
+      amount: formatCurrency(displayTotal),
+      how: ctx.storeGoalHit
         ? "Plus store goal bonus share on top."
-        : "Base salary plus all cash incentive components above.",
+        : "Base salary plus commission, OT, and compliance cash rewards.",
       tone: "total",
     },
   ];
@@ -106,7 +120,18 @@ export function buildSaFullPictureRows(
   return rows;
 }
 
-export function buildSaFullPictureContextLine(ctx: SaFullPictureContext, employeeName: string): string {
-  const goal = ctx.storeGoalHit ? "Store hit ₱6M goal" : "Store goal pending";
-  return `Branch: ${ctx.branchLabel} · Month: ${ctx.month} · ${goal} · SA: ${employeeName}`;
+export function buildSaFullPictureContextLine(
+  ctx: SaFullPictureContext,
+  employeeName: string,
+  salesTotal: number,
+  complianceScore: number,
+  complianceTier: string,
+): string {
+  const firstName = employeeName.trim().split(/\s+/)[0] || employeeName;
+  const goal = ctx.storeGoalHit ? "Store hit P6M goal" : "Store goal pending";
+  return (
+    `Branch: ${ctx.branchLabel}. Month: ${formatSaMonthLabel(ctx.month)}. ${goal}. ` +
+    `${firstName}'s sales: ${formatCurrency(salesTotal)}. ` +
+    `Compliance score: ${complianceScore} pts (${complianceTier}). OT worked: ${ctx.otHoursTotal} hrs.`
+  );
 }

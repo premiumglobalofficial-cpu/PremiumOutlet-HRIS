@@ -35,11 +35,13 @@ import { RealFaceVerification } from "@/components/attendance/real-face-verifica
 import { SelfieCapture } from "@/components/attendance/selfie-capture";
 import { LocationTracker } from "@/components/attendance/location-tracker";
 import { BreakTimer } from "@/components/attendance/break-timer";
+import { BreakPolicyReminder } from "@/components/attendance/break-policy-reminder";
 import { EmployeeQRDisplay } from "@/components/attendance/employee-qr-display";
 import { ProjectQrScanner } from "@/components/attendance/project-qr-scanner";
 import { EnrollmentReminder } from "@/components/attendance/enrollment-reminder";
 import { stopWriteThrough, startWriteThrough, forceRehydrate } from "@/services/sync.service";
 import { findCurrentEmployee, getAttendanceEmployeeIds } from "@/lib/current-employee";
+import { format } from "date-fns";
 
 type CheckInStep = "idle" | "locating" | "location_result" | "done" | "error" | "selfie" | "qr_scan";
 
@@ -274,6 +276,22 @@ export default function EmployeeView() {
     // ─── Penalty state ────────────────────────────────────────────
     const [penaltyRemainMs, setPenaltyRemainMs] = useState(0);
     const [devToolsOpen, setDevToolsOpen] = useState(false);
+    const [isSaEmployee, setIsSaEmployee] = useState(false);
+
+    useEffect(() => {
+        if (!myEmployeeId) {
+            setIsSaEmployee(false);
+            return;
+        }
+        const month = format(new Date(), "yyyy-MM");
+        fetch(`/api/sa-commission/my-incentives?month=${encodeURIComponent(month)}`, {
+            credentials: "include",
+            cache: "no-store",
+        })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => setIsSaEmployee(!!d?.employeeId))
+            .catch(() => setIsSaEmployee(false));
+    }, [myEmployeeId]);
 
     // Continuous devtools monitor — shows warning only; penalty is applied
     // only when the employee actually attempts to check in.
@@ -634,6 +652,8 @@ export default function EmployeeView() {
             {myProject?.verificationMethod === "face_only" && myEmployeeId && (
                 <EnrollmentReminder employeeId={myEmployeeId} compact />
             )}
+
+            {isSaEmployee && <BreakPolicyReminder />}
 
             {/* ── Row 1: Clock Status + Weekly Stats (single visual row) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">

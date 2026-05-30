@@ -34,6 +34,7 @@ type Props = {
 
 export function SaEmployeeIncentivesView({ employeeId, employeeName }: Props) {
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
+  const [activeTab, setActiveTab] = useState("full-picture");
   const [data, setData] = useState<MySaIncentivesResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -64,7 +65,13 @@ export function SaEmployeeIncentivesView({ employeeId, employeeName }: Props) {
       otHoursTotal: data.otHoursTotal,
     };
     return {
-      contextLine: buildSaFullPictureContextLine(ctx, employeeName),
+      contextLine: buildSaFullPictureContextLine(
+        ctx,
+        employeeName,
+        data.salesTotal,
+        b.complianceScore,
+        b.complianceTier,
+      ),
       rows: buildSaFullPictureRows(b, ctx),
     };
   }, [b, data, employeeName]);
@@ -89,7 +96,7 @@ export function SaEmployeeIncentivesView({ employeeId, employeeName }: Props) {
         <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
       </div>
 
-      <Tabs defaultValue="full-picture" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="flex flex-wrap h-auto gap-1">
           <TabsTrigger value="full-picture" className="gap-1.5">
             <Wallet className="h-3.5 w-3.5" />
@@ -140,13 +147,7 @@ export function SaEmployeeIncentivesView({ employeeId, employeeName }: Props) {
                         : "Draft preview — subject to COO approval"}
                   </Badge>
                 </div>
-                <CardDescription>{fullPicture.contextLine}</CardDescription>
-                {data && data.salesTotal > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Your sales: {formatCurrency(data.salesTotal)} · Compliance: {b.complianceScore}{" "}
-                    pts ({b.complianceTier}) · OT: {data.otHoursTotal} hrs
-                  </p>
-                )}
+                <CardDescription className="text-xs leading-relaxed">{fullPicture.contextLine}</CardDescription>
               </CardHeader>
               <CardContent className="overflow-x-auto p-0 sm:p-6 sm:pt-0 space-y-3">
                 <Table>
@@ -260,7 +261,10 @@ export function SaEmployeeIncentivesView({ employeeId, employeeName }: Props) {
                       <TableRow
                         key={h.month}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setMonth(h.month)}
+                        onClick={() => {
+                          setMonth(h.month);
+                          setActiveTab("full-picture");
+                        }}
                       >
                         <TableCell className="font-medium">{h.month}</TableCell>
                         <TableCell>
@@ -282,6 +286,9 @@ export function SaEmployeeIncentivesView({ employeeId, employeeName }: Props) {
                     ))}
                   </TableBody>
                 </Table>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Tap a row to open the full computation breakdown for that month.
+                </p>
               </CardContent>
             </Card>
           )}
