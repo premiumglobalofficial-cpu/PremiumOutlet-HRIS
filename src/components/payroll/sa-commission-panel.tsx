@@ -35,7 +35,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CheckCircle, Download, Sparkles } from "lucide-react";
+import { CheckCircle, Download, Info, Sparkles } from "lucide-react";
+import { SA_EOM_BLOCKED_REASON } from "@/lib/sa-eom-policy";
 import type { SaEmploymentType } from "@/types";
 
 const BRANCHES = [
@@ -219,6 +220,8 @@ export function SaCommissionPanel() {
   };
 
   const goalHit = (cycle?.branchTotalSales ?? 0) >= SA_STORE_GOAL_THRESHOLD;
+  const approvedCount = cycle?.payouts.filter((p) => p.status === "approved").length ?? 0;
+  const draftCount = cycle?.payouts.filter((p) => p.status === "draft").length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -297,6 +300,53 @@ export function SaCommissionPanel() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="rounded-lg border border-violet-200 dark:border-violet-800 bg-gradient-to-br from-violet-50/80 to-amber-50/40 dark:from-violet-950/25 dark:to-amber-950/15 p-4 space-y-3">
+        <p className="text-sm font-semibold text-violet-900 dark:text-violet-100 flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0" />
+          EOM payroll checklist
+        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Variable SA pay (commission, OT, compliance cash, store goal) is released on the{" "}
+          <strong>2nd cutoff (EOM)</strong> only. Mid-month runs pay base + statutory.
+        </p>
+        <ol className="text-xs space-y-2 list-decimal list-inside text-muted-foreground">
+          <li>
+            <span className={draftCount > 0 || approvedCount > 0 ? "text-foreground" : ""}>
+              Enter POS sales, OT hours, and compliance for {month}
+            </span>
+            {cycle && (
+              <span className="ml-1 text-[10px]">
+                ({cycle.payouts.length} payout{cycle.payouts.length === 1 ? "" : "s"})
+              </span>
+            )}
+          </li>
+          <li>
+            <span className={approvedCount > 0 ? "text-emerald-700 dark:text-emerald-400 font-medium" : ""}>
+              COO approve payouts
+            </span>
+            {approvedCount > 0 && (
+              <Badge variant="secondary" className="ml-2 text-[10px]">
+                {approvedCount} approved
+              </Badge>
+            )}
+            {draftCount > 0 && approvedCount === 0 && (
+              <Badge variant="outline" className="ml-2 text-[10px]">
+                {draftCount} draft pending
+              </Badge>
+            )}
+          </li>
+          <li>
+            Payroll tab → select <strong>2nd cutoff</strong> → enable{" "}
+            <strong>SA Incentives</strong> toggle → issue payslips
+          </li>
+        </ol>
+        {approvedCount > 0 && (
+          <p className="text-[10px] text-violet-800 dark:text-violet-200 border-t border-violet-200/60 dark:border-violet-800/60 pt-2">
+            {SA_EOM_BLOCKED_REASON}
+          </p>
+        )}
+      </div>
 
       <SaComplianceKpiForm
         key={complianceEmpId}

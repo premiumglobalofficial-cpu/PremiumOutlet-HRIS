@@ -17,6 +17,7 @@ export const SA_STANDARD_HOURS_PER_DAY = 8;
 export const SA_HOURLY_RATE = round2(SA_DAILY_RATE / SA_STANDARD_HOURS_PER_DAY);
 export const SA_OT_RATE = round2(SA_HOURLY_RATE * 1.25);
 export const SA_MAX_OT_HOURS_PER_DAY = 2;
+export const SA_MAX_OT_HOURS_PER_MONTH = 24;
 export const SA_MAX_COMPLIANCE_SCORE = 360;
 export const SA_MAX_WEEKS_PER_MONTH = 4;
 export const SA_BREAK_MINUTES_PER_SHIFT = 60;
@@ -206,14 +207,15 @@ export function validateSaOtDay(hours: number): { ok: boolean; error?: string } 
   return { ok: true };
 }
 
-/** Sum approved OT hours per day (each day capped at 2h) × ot_rate */
+/** Sum approved OT hours per day (each day capped at 2h), monthly cap 24h × ot_rate */
 export function computeSaOtPay(approvedHoursPerDay: number[]): number {
   if (!approvedHoursPerDay.length) return 0;
   const totalHours = approvedHoursPerDay.reduce(
     (sum, h) => sum + capOtHoursForDay(h),
     0,
   );
-  return round2(totalHours * SA_OT_RATE);
+  const cappedMonthly = Math.min(totalHours, SA_MAX_OT_HOURS_PER_MONTH);
+  return round2(cappedMonthly * SA_OT_RATE);
 }
 
 // ─── 2C Compliance ──────────────────────────────────────────────────────────

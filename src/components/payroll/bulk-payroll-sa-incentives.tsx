@@ -5,7 +5,11 @@ import { Sparkles, Info } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
-import { getApprovedSaIncentiveAllowances } from "@/lib/sa-payroll-bridge";
+import {
+  getApprovedSaIncentiveAllowances,
+  type SaPayrollBridgeOptions,
+} from "@/lib/sa-payroll-bridge";
+import { isSaIncentiveEligibleCutoff, SA_EOM_BLOCKED_REASON } from "@/lib/sa-eom-policy";
 import type { SaPayoutRecord } from "@/types";
 import type { SaMonthlyPayoutBreakdown } from "@/lib/sa-commission";
 
@@ -18,11 +22,24 @@ export type SaIncentivePreview = {
 export function buildSaIncentivePreviewMap(
   payouts: SaPayoutRecord[],
   month: string,
+  bridgeOptions: SaPayrollBridgeOptions = {},
+  getPayFrequency?: (employeeId: string) => string | undefined,
 ): Map<string, SaIncentivePreview> {
   const map = new Map<string, SaIncentivePreview>();
   for (const p of payouts) {
     if (p.status !== "approved") continue;
-    const { amount, note, payout } = getApprovedSaIncentiveAllowances(payouts, month, p.employeeId);
+    const options: SaPayrollBridgeOptions = getPayFrequency
+      ? {
+          cutoff: bridgeOptions.cutoff,
+          payFrequency: getPayFrequency(p.employeeId) ?? bridgeOptions.payFrequency,
+        }
+      : bridgeOptions;
+    const { amount, note, payout } = getApprovedSaIncentiveAllowances(
+      payouts,
+      month,
+      p.employeeId,
+      options,
+    );
     if (amount > 0 && payout) {
       map.set(p.employeeId, { amount, note, breakdown: payout.breakdown });
     }
@@ -33,6 +50,9 @@ export function buildSaIncentivePreviewMap(
 type Props = {
   month: string;
   monthLabel: string;
+  cutoff: "first" | "second";
+  payFrequency?: string;
+  getEmployeePayFrequency?: (employeeId: string) => string | undefined;
   enabled: boolean;
   onEnabledChange: (enabled: boolean) => void;
   payouts: SaPayoutRecord[];
@@ -43,15 +63,24 @@ type Props = {
 export function BulkPayrollSaIncentives({
   month,
   monthLabel,
+  cutoff,
+  payFrequency = "semi_monthly",
+  getEmployeePayFrequency,
   enabled,
   onEnabledChange,
   payouts,
   selectedEmployeeIds,
   getEmployeeName,
 }: Props) {
+  const eomEligible = isSaIncentiveEligibleCutoff(payFrequency, cutoff);
+  const bridgeOptions = useMemo(
+    () => ({ cutoff, payFrequency }),
+    [cutoff, payFrequency],
+  );
+
   const previewMap = useMemo(
-    () => buildSaIncentivePreviewMap(payouts, month),
-    [payouts, month],
+    () => buildSaIncentivePreviewMap(payouts, month, bridgeOptions, getEmployeePayFrequency),
+    [payouts, month, bridgeOptions, getEmployeePayFrequency],
   );
 
   const summary = useMemo(() => {
@@ -95,24 +124,37 @@ export function BulkPayrollSaIncentives({
             SA Incentives
           </p>
           <p className="text-[10px] text-muted-foreground leading-snug">
-            Approved sales associate payouts for {monthLabel}. Adds to allowances when issuing.
+            {eomEligible
+              ? `EOM run — approved variable pay for ${monthLabel} adds to allowances.`
+              : "1st cutoff — base pay only. Variable SA pay is blocked until 2nd cutoff (EOM)."}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-medium text-muted-foreground">
-              {enabled ? "On" : "Off"}
+              {enabled && eomEligible ? "On" : "Off"}
             </span>
             <Switch
-              checked={enabled}
+              checked={enabled && eomEligible}
               onCheckedChange={onEnabledChange}
+              disabled={!eomEligible}
               aria-label="Include SA incentives in payroll"
             />
           </div>
         </div>
       </div>
 
-      {!hasApproved ? (
+      {!eomEligible && (
+        <div className="flex gap-2 rounded-md border border-amber-300/70 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-950/30 px-2.5 py-2">
+          <Info className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-[10px] text-amber-800 dark:text-amber-200 leading-relaxed">
+            {SA_EOM_BLOCKED_REASON}
+          </p>
+        </div>
+      )}
+
+      {eomEligible && (
+        !hasApproved ? (
         <div className="flex gap-2 rounded-md border border-dashed border-violet-300/60 dark:border-violet-700/60 bg-background/60 px-2.5 py-2">
           <Info className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
           <p className="text-[10px] text-muted-foreground leading-relaxed">
@@ -188,7 +230,7 @@ export function BulkPayrollSaIncentives({
             </p>
           )}
         </>
-      )}
+      ))}
     </div>
   );
 }

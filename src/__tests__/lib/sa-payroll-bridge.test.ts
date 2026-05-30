@@ -39,9 +39,39 @@ describe("getApprovedSaIncentiveAllowances", () => {
   });
 
   it("sums approved cash components excluding base", () => {
-    const result = getApprovedSaIncentiveAllowances([payout], "2026-05", "EMP001");
+    const result = getApprovedSaIncentiveAllowances([payout], "2026-05", "EMP001", {
+      cutoff: "second",
+      payFrequency: "semi_monthly",
+    });
     expect(result.amount).toBe(4684.38);
     expect(result.note).toContain("SA incentives");
+  });
+
+  it("returns 0 on 1st semi-monthly cutoff with blockedReason", () => {
+    const result = getApprovedSaIncentiveAllowances([payout], "2026-05", "EMP001", {
+      cutoff: "first",
+      payFrequency: "semi_monthly",
+    });
+    expect(result.amount).toBe(0);
+    expect(result.payout).not.toBeNull();
+    expect(result.blockedReason).toContain("2nd cutoff");
+  });
+
+  it("allows monthly pay frequency on 1st cutoff", () => {
+    const result = getApprovedSaIncentiveAllowances([payout], "2026-05", "EMP001", {
+      cutoff: "first",
+      payFrequency: "monthly",
+    });
+    expect(result.amount).toBe(4684.38);
+  });
+
+  it("blocks weekly frequency even on 2nd cutoff", () => {
+    const result = getApprovedSaIncentiveAllowances([payout], "2026-05", "EMP001", {
+      cutoff: "second",
+      payFrequency: "weekly",
+    });
+    expect(result.amount).toBe(0);
+    expect(result.blockedReason).toBeDefined();
   });
 
   it("does not double-count OT when SA incentives apply", () => {

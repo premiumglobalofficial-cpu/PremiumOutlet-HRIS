@@ -59,6 +59,7 @@ import {
 } from "@/components/payroll/bulk-payroll-sa-incentives";
 import { useSaCommissionStore } from "@/store/sa-commission.store";
 import { getApprovedSaIncentiveAllowances, resolvePayrollOvertimeForSa } from "@/lib/sa-payroll-bridge";
+import { isSaIncentiveEligibleCutoff } from "@/lib/sa-eom-policy";
 import { persistSaCycle } from "@/services/sa-commission.service";
 import { ExportBackupDialog } from "@/components/export-backup-dialog";
 import { ImportDataDialog } from "@/components/import-data-dialog";
@@ -84,6 +85,7 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
     const { payslips, runs, adjustments, finalPayComputations, issuePayslip, confirmPayslip, publishPayslip, recordPayment, confirmPaidByFinance, holdPayment, releasePaymentHold, rejectHoldSignature, lockRun, unlockRun, publishRun, endRun, reactivateRun, markRunPaid, approveAdjustment, applyAdjustment, createAdjustment, computeFinalPay, generate13thMonth, exportBankFile, createDraftRun, validateRun, resetToSeed, paySchedule, updatePaySchedule, savePaySchedule, signatureConfig, updateSignatureConfig, deductionOverrides, setDeductionOverride, removeDeductionOverride, clearEmployeeOverrides, getDeductionOverride, getEmployeeOverrides, globalDefaults, updateGlobalDefault, getGlobalDefault, updatePayslipFromServer, isPayslipRunLocked, batchReleasePaymentHold, batchPublishPayslips, batchRecordPayment } = usePayrollStore();
     const getApprovedSaPayouts = useSaCommissionStore((s) => s.getApprovedPayouts);
     const markSaPayoutsProcessed = useSaCommissionStore((s) => s.markPayoutsProcessed);
+    const saCycles = useSaCommissionStore((s) => s.cycles);
     const employees = useEmployeesStore((s) => s.employees);
     const currentUser = useAuthStore((s) => s.currentUser);
     const { getActiveByEmployee, recordDeduction } = useLoansStore();
@@ -376,12 +378,26 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
 
     const approvedSaPayouts = useMemo(
         () => getApprovedSaPayouts(selectedMonth),
-        [getApprovedSaPayouts, selectedMonth],
+        [getApprovedSaPayouts, selectedMonth, saCycles],
+    );
+    const getEmployeePayFrequency = useCallback(
+        (id: string) => employees.find((e) => e.id === id)?.payFrequency || paySchedule.defaultFrequency,
+        [employees, paySchedule.defaultFrequency],
     );
     const saIncentivePreviewMap = useMemo(
-        () => buildSaIncentivePreviewMap(approvedSaPayouts, selectedMonth),
-        [approvedSaPayouts, selectedMonth],
+        () => buildSaIncentivePreviewMap(approvedSaPayouts, selectedMonth, {
+            cutoff,
+            payFrequency: paySchedule.defaultFrequency,
+        }, getEmployeePayFrequency),
+        [approvedSaPayouts, selectedMonth, cutoff, paySchedule.defaultFrequency, getEmployeePayFrequency],
     );
+    const saEomEligible = useMemo(
+        () => isSaIncentiveEligibleCutoff(paySchedule.defaultFrequency, cutoff),
+        [paySchedule.defaultFrequency, cutoff],
+    );
+    useEffect(() => {
+        if (!saEomEligible) setIncludeSaIncentives(false);
+    }, [saEomEligible]);
     const selectedMonthLabel = useMemo(
         () => format(new Date(`${selectedMonth}-01`), "MMMM yyyy"),
         [selectedMonth],
@@ -491,10 +507,16 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                 let saIncentive = 0;
                 let saNote = "";
                 if (includeSaIncentives) {
-                    const sa = getApprovedSaIncentiveAllowances(approvedSaPayouts, saPayMonth, empId);
-                    saIncentive = sa.amount;
-                    saNote = sa.note;
-                    if (saIncentive > 0) saProcessedIds.push(empId);
+                    const empFreq = emp.payFrequency || paySchedule.defaultFrequency;
+                    if (isSaIncentiveEligibleCutoff(empFreq, cutoff)) {
+                        const sa = getApprovedSaIncentiveAllowances(approvedSaPayouts, saPayMonth, empId, {
+                            cutoff,
+                            payFrequency: empFreq,
+                        });
+                        saIncentive = sa.amount;
+                        saNote = sa.note;
+                        if (saIncentive > 0) saProcessedIds.push(empId);
+                    }
                 }
 
                 const allowances = allowancesVal + saIncentive;
@@ -703,11 +725,12 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
             }
 
             const loanMsg = totalLoanDeductions > 0 ? ` (incl. ${formatCurrency(totalLoanDeductions)} total loan deductions)` : "";
+            const saMsg = saProcessedIds.length > 0 ? ` · SA incentives for ${saProcessedIds.length} associate(s)` : "";
             if (skippedDuplicates > 0) toast.warning(`${skippedDuplicates} employee${skippedDuplicates > 1 ? "s" : ""} already had payslips for this period — skipped.`);
             if (zeroNetPayCount > 0) toast.warning(`${zeroNetPayCount} employee${zeroNetPayCount > 1 ? "s" : ""} issued with ₱0 net pay — review deductions before locking.`);
-            if (successCount > 0) toast.success(`Issued ${successCount} payslip${successCount > 1 ? "s" : ""}${loanMsg}`);
+            if (successCount > 0) toast.success(`Issued ${successCount} payslip${successCount > 1 ? "s" : ""}${loanMsg}${saMsg}`);
             else if (skippedDuplicates > 0) toast.info("No new payslips issued — all selected employees already have payslips for this period.");
-            setOpen(false); setSelectedEmployeeIds([]); setFormAllowances("0"); setFormOtherDeductions("0"); setFormOTHours("0"); setFormNightDiffHours("0"); setFormNotes(""); setFormIssuedAt(format(new Date(), "yyyy-MM-dd")); setFormPeriodEnd(computeSmartPeriodEnd(naturalBounds)); setEmpSearchTerm(""); setGrossOverrides({}); setExpandedOverrideEmpId(null); setIncludeSaIncentives(true);
+            setOpen(false); setSelectedEmployeeIds([]); setFormAllowances("0"); setFormOtherDeductions("0"); setFormOTHours("0"); setFormNightDiffHours("0"); setFormNotes(""); setFormIssuedAt(format(new Date(), "yyyy-MM-dd")); setFormPeriodEnd(computeSmartPeriodEnd(naturalBounds)); setEmpSearchTerm(""); setGrossOverrides({}); setExpandedOverrideEmpId(null); setIncludeSaIncentives(saEomEligible);
         } catch (err) {
             toast.error(`Payslip issuance failed: ${err instanceof Error ? err.message : "Unknown error"}`);
         }
@@ -1072,7 +1095,7 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                                                 <div><label className="text-xs text-muted-foreground">OT Hours (125%)</label><Input type="number" min={0} step="0.5" value={formOTHours} onChange={(e) => setFormOTHours(e.target.value)} className="mt-1 h-8 text-xs" placeholder="0" /></div>
                                                 <div><label className="text-xs text-muted-foreground">Night Diff (+10%)</label><Input type="number" min={0} step="0.5" value={formNightDiffHours} onChange={(e) => setFormNightDiffHours(e.target.value)} className="mt-1 h-8 text-xs" placeholder="0" /></div>
                                             </div>
-                                            {includeSaIncentives && saIncentivePreviewMap.size > 0 && (
+                                            {includeSaIncentives && saEomEligible && saIncentivePreviewMap.size > 0 && (
                                                 <p className="text-[10px] text-blue-700/90 dark:text-blue-300/90 mt-2 leading-relaxed">
                                                     SA associates with approved incentives use OT from the SA engine — wizard OT hours are skipped for them to avoid double pay.
                                                 </p>
@@ -1081,6 +1104,9 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                                         <BulkPayrollSaIncentives
                                             month={selectedMonth}
                                             monthLabel={selectedMonthLabel}
+                                            cutoff={cutoff}
+                                            payFrequency={paySchedule.defaultFrequency}
+                                            getEmployeePayFrequency={getEmployeePayFrequency}
                                             enabled={includeSaIncentives}
                                             onEnabledChange={setIncludeSaIncentives}
                                             payouts={approvedSaPayouts}
@@ -1122,7 +1148,7 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                                                         <strong>Auto-computed per employee:</strong><br />
                                                         • Gross from salary &middot; Gov&apos;t deductions &middot; Loans<br />
                                                         • Holiday pay (DOLE) &middot; OT 125% &middot; Night Diff +10%
-                                                        {includeSaIncentives && saIncentivePreviewMap.size > 0 && (
+                                                        {includeSaIncentives && saEomEligible && saIncentivePreviewMap.size > 0 && (
                                                             <span className="block mt-1 text-violet-700 dark:text-violet-300">
                                                                 • SA incentives (approved) added to allowances
                                                             </span>
@@ -1174,13 +1200,16 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
                                                         const alreadyIssued = !!alreadyIssuedSlip;
                                                         const overrideActive = !!(grossOverrides[emp.id] && Number(grossOverrides[emp.id]) > 0);
                                                         const isExpanded = expandedOverrideEmpId === emp.id;
-                                                        const saPreview = includeSaIncentives ? saIncentivePreviewMap.get(emp.id) : undefined;
+                                                        const empSaEomEligible = isSaIncentiveEligibleCutoff(empFreq, cutoff);
+                                                        const hasApprovedSa = approvedSaPayouts.some((p) => p.employeeId === emp.id);
+                                                        const saPreview = includeSaIncentives && empSaEomEligible ? saIncentivePreviewMap.get(emp.id) : undefined;
+                                                        const saPendingEom = hasApprovedSa && !empSaEomEligible;
                                                         return (
                                                             <div key={emp.id} className={`rounded-lg border transition-colors ${alreadyIssued ? "opacity-50 cursor-not-allowed bg-muted/30 border-transparent" : saPreview ? "border-violet-300/50 bg-violet-50/30 dark:bg-violet-950/15" : overrideActive ? "border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/20" : "border-transparent hover:bg-muted/50 hover:border-border/50"}`}>
                                                                 <div onClick={() => !alreadyIssued && toggleEmployee(emp.id)} className={`flex items-center gap-3 p-2 ${alreadyIssued ? "cursor-not-allowed" : "cursor-pointer"}`}>
                                                                     <Checkbox checked={selectedEmployeeIds.includes(emp.id)} onCheckedChange={() => !alreadyIssued && toggleEmployee(emp.id)} disabled={alreadyIssued} />
                                                                     <div className="flex-1 min-w-0">
-                                                                        <p className="text-sm font-medium">{emp.name}{alreadyIssuedSlip && <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 font-normal">✓ Issued ({alreadyIssuedSlip.status})</span>}{overrideActive && <span className="ml-2 text-xs text-amber-700 dark:text-amber-400 font-semibold">⚡ Gross override</span>}{saPreview && <span className="ml-2 text-xs text-violet-700 dark:text-violet-300 font-semibold">✦ SA approved</span>}</p>
+                                                                        <p className="text-sm font-medium">{emp.name}{alreadyIssuedSlip && <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 font-normal">✓ Issued ({alreadyIssuedSlip.status})</span>}{overrideActive && <span className="ml-2 text-xs text-amber-700 dark:text-amber-400 font-semibold">⚡ Gross override</span>}{saPreview && <span className="ml-2 text-xs text-violet-700 dark:text-violet-300 font-semibold">✦ SA approved</span>}{saPendingEom && <span className="ml-2 text-xs text-amber-700 dark:text-amber-400 font-semibold">⏳ SA at EOM</span>}</p>
                                                                         <p className="text-xs text-muted-foreground">{emp.role} • {emp.department} • {formatCurrency(emp.salary)}/mo</p>
                                                                     </div>
                                                                     <div className="flex flex-col items-end gap-0.5 shrink-0">

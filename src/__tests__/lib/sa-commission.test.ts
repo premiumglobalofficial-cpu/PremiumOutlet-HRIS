@@ -77,6 +77,11 @@ describe("SA OT pay", () => {
     expect(validateSaOtDay(3).ok).toBe(false);
     expect(validateSaOtDay(2).ok).toBe(true);
   });
+
+  it("caps OT at 24 hours per month", () => {
+    const overCap = Array(15).fill(2);
+    expect(computeSaOtPay(overCap)).toBeCloseTo(24 * SA_OT_RATE, 2);
+  });
 });
 
 describe("SA compliance", () => {

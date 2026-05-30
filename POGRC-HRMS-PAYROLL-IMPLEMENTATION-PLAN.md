@@ -4,6 +4,8 @@
 **Scope:** Sales Associate (SA) commission engine integrated with existing NexHRIS / Premium Outlets payroll  
 **Approach:** Karpathy-style — pure calculation module first, then store + UI, then payroll export wiring
 
+**EOM integration (v2):** See [`SA-INCENTIVES-EOM-INTEGRATION-PLAN.md`](./SA-INCENTIVES-EOM-INTEGRATION-PLAN.md) — variable SA pay on 2nd cutoff only per `SAincentives.md`.
+
 ---
 
 ## Assumption
