@@ -114,21 +114,21 @@ npm test -- sa-eom sa-payroll-bridge sa-commission
 
 ### Phase 2 — Operational UI (from implementation plan)
 
-| Task | Detail |
-|------|--------|
-| Weekly compliance grid | 4 weeks × earn/deduct fields → `sa_compliance_weeks` |
-| OT approval modal | Date, hours, cash\|offset, approver → `sa_ot_approvals` |
-| SA employee view | `/employee/sa-incentives` read-only approved breakdown |
-| OIC branch scope | Filter by supervisor branch |
+| Task | Detail | Status |
+|------|--------|--------|
+| Weekly compliance grid | 4 weeks × earn/deduct fields → `sa_compliance_weeks` | **Done** |
+| OT approval modal | Date, hours, cash\|offset, approver → `sa_ot_approvals` | **Done** |
+| SA employee view | `/employee/sa-incentives` read-only approved breakdown | **Done** |
+| OIC branch scope | Filter by supervisor branch | Phase 3 |
 
 ### Phase 3 — Reports (6 outputs)
 
-1. Monthly Payout Report  
-2. Compliance Score Card  
-3. KPI Ranking Board  
-4. OT Summary  
-5. Store Goal Dashboard  
-6. SA Self-Service (employee)
+1. Monthly Payout Report — **Done** (`exportSaPayoutReport`)  
+2. Compliance Score Card — **Done** (`exportSaComplianceReport`)  
+3. KPI Ranking Board — **Done** (`exportSaKpiRanking`)  
+4. OT Summary — **Done** (`exportSaOtSummaryByEmployee` + detail export)  
+5. Store Goal Dashboard — **Done** (`exportSaStoreGoalDashboard`)  
+6. SA Self-Service (employee) — **Done** (My Payslips → SA Incentives)
 
 ### Phase 4 — POS & integrity
 

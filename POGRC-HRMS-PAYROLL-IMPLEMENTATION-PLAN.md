@@ -193,9 +193,10 @@ non_cash =
 - [x] API `GET/PUT /api/sa-commission/cycles` — sync cycles to Supabase
 - [x] Compliance & KPI entry UI on SA Incentives panel
 - [x] Wire `issuePayslip` → approved SA incentives via `getApprovedSaIncentiveAllowances()`
-- [ ] Dedicated OT approval UI (`sa_ot_approvals` table)
-- [ ] Weekly compliance per-week UI (`sa_compliance_weeks`)
-- [ ] SA employee self-service view
+- [x] OT approval UI (`sa_ot_approvals` table + pre-approval log panel)
+- [x] Weekly compliance per-week UI (4-week grid + DB jsonb)
+- [x] SA employee self-service view (My Payslips → SA Incentives)
+- [x] HR report exports (6 CSV reports via Export all reports)
 
 ### Phase 3 — Reports (6 outputs from brief)
 

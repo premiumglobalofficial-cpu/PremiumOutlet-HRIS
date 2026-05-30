@@ -13,12 +13,8 @@ import {
   type SaEmploymentType,
 } from "@/lib/sa-commission";
 import type { SaWeekEarnGrid } from "@/lib/sa-compliance-weeks";
-import type {
-  SaEmployeeProfile,
-  SaMonthlyCycle,
-  SaPayoutRecord,
-  SaPayoutStatus,
-} from "@/types";
+import { resolveOtHoursForPayout } from "@/lib/sa-ot-approvals";
+import type { SaOtApproval, SaEmployeeProfile, SaMonthlyCycle, SaPayoutRecord, SaPayoutStatus } from "@/types";
 
 interface SaCommissionState {
   profiles: SaEmployeeProfile[];
@@ -55,6 +51,9 @@ interface SaCommissionState {
   replaceCycle: (cycle: SaMonthlyCycle) => void;
   markPayoutsProcessed: (month: string, employeeIds: string[]) => void;
   revertPayoutToDraft: (payoutId: string) => void;
+  addOtApproval: (month: string, branchId: string, approval: SaOtApproval) => void;
+  approveOtApproval: (month: string, branchId: string, approvalId: string, approvedBy: string) => void;
+  rejectOtApproval: (month: string, branchId: string, approvalId: string) => void;
 }
 
 function cycleKey(month: string, branchId: string) {
@@ -123,6 +122,7 @@ export const useSaCommissionStore = create<SaCommissionState>()(
           complianceWeeksByEmployee: {},
           salesByEmployee: {},
           otHoursByEmployee: {},
+          otApprovalsByEmployee: {},
           kpiByEmployee: {},
           payouts: [],
           updatedAt: new Date().toISOString(),
@@ -256,6 +256,14 @@ export const useSaCommissionStore = create<SaCommissionState>()(
               ? prev.status
               : "draft";
 
+          const otApprovals = cycle.otApprovalsByEmployee?.[p.employeeId] ?? [];
+          const manualOt = cycle.otHoursByEmployee[p.employeeId] ?? [];
+          const approvedOtHoursPerDay = resolveOtHoursForPayout(
+            otApprovals,
+            month,
+            manualOt,
+          );
+
           const breakdown =
             (prev?.status === "approved" || prev?.status === "processed") && prev?.breakdown
               ? prev.breakdown
@@ -264,7 +272,7 @@ export const useSaCommissionStore = create<SaCommissionState>()(
                   month,
                   employmentType: p.employmentType,
                   salesTotal: cycle.salesByEmployee[p.employeeId] ?? 0,
-                  approvedOtHoursPerDay: cycle.otHoursByEmployee[p.employeeId] ?? [],
+                  approvedOtHoursPerDay,
                   complianceEarned: cycle.complianceEarned[p.employeeId] ?? emptyEarned(),
                   complianceDeducted: cycle.complianceDeducted[p.employeeId] ?? emptyDeducted(),
                   storeGoalShare: goalShares.get(p.employeeId) ?? 0,
@@ -372,6 +380,79 @@ export const useSaCommissionStore = create<SaCommissionState>()(
             updatedAt: new Date().toISOString(),
           })),
         }));
+      },
+
+      addOtApproval: (month, branchId, approval) => {
+        get().getOrCreateCycle(month, branchId);
+        set((s) => ({
+          cycles: s.cycles.map((c) =>
+            c.month === month && c.branchId === branchId
+              ? {
+                  ...c,
+                  otApprovalsByEmployee: {
+                    ...(c.otApprovalsByEmployee ?? {}),
+                    [approval.employeeId]: [
+                      ...(c.otApprovalsByEmployee?.[approval.employeeId] ?? []),
+                      approval,
+                    ],
+                  },
+                  updatedAt: new Date().toISOString(),
+                }
+              : c,
+          ),
+        }));
+        get().recomputePayouts(month, branchId);
+      },
+
+      approveOtApproval: (month, branchId, approvalId, approvedBy) => {
+        set((s) => ({
+          cycles: s.cycles.map((c) =>
+            c.month === month && c.branchId === branchId
+              ? {
+                  ...c,
+                  otApprovalsByEmployee: Object.fromEntries(
+                    Object.entries(c.otApprovalsByEmployee ?? {}).map(([empId, list]) => [
+                      empId,
+                      list.map((a) =>
+                        a.id === approvalId
+                          ? {
+                              ...a,
+                              status: "approved" as const,
+                              approvedBy,
+                              approvedAt: new Date().toISOString(),
+                            }
+                          : a,
+                      ),
+                    ]),
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : c,
+          ),
+        }));
+        get().recomputePayouts(month, branchId);
+      },
+
+      rejectOtApproval: (month, branchId, approvalId) => {
+        set((s) => ({
+          cycles: s.cycles.map((c) =>
+            c.month === month && c.branchId === branchId
+              ? {
+                  ...c,
+                  otApprovalsByEmployee: Object.fromEntries(
+                    Object.entries(c.otApprovalsByEmployee ?? {}).map(([empId, list]) => [
+                      empId,
+                      list.map((a) =>
+                        a.id === approvalId ? { ...a, status: "rejected" as const } : a,
+                      ),
+                    ]),
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : c,
+          ),
+        }));
+        get().recomputePayouts(month, branchId);
       },
     }),
     {

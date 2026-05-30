@@ -38,6 +38,15 @@ import { toast } from "sonner";
 import { CheckCircle, Download, Info, Sparkles, BookOpen, Settings2 } from "lucide-react";
 import { SA_EOM_BLOCKED_REASON, getSaVariableCapWarning } from "@/lib/sa-eom-policy";
 import { SaIncentivesReferenceTables } from "@/components/payroll/sa-incentives-reference-tables";
+import { SaOtApprovalPanel } from "@/components/payroll/sa-ot-approval-panel";
+import {
+  exportSaComplianceReport,
+  exportSaKpiRanking,
+  exportSaOtReport,
+  exportSaOtSummaryByEmployee,
+  exportSaPayoutReport,
+  exportSaStoreGoalDashboard,
+} from "@/lib/sa-report-export";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SaEmploymentType } from "@/types";
 
@@ -65,6 +74,9 @@ export function SaCommissionPanel() {
     getApprovedPayouts,
     replaceCycle,
     revertPayoutToDraft,
+    addOtApproval,
+    approveOtApproval,
+    rejectOtApproval,
   } = useSaCommissionStore();
 
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
@@ -166,6 +178,11 @@ export function SaCommissionPanel() {
   const complianceEmpPayout = cycle?.payouts.find((p) => p.employeeId === complianceEmpId);
   const complianceLocked =
     complianceEmpPayout?.status === "approved" || complianceEmpPayout?.status === "processed";
+  const otApprovals = useMemo(
+    () => Object.values(cycle?.otApprovalsByEmployee ?? {}).flat(),
+    [cycle?.otApprovalsByEmployee],
+  );
+  const getEmpName = (id: string) => employees.find((e) => e.id === id)?.name ?? id;
 
   const ensureProfiles = () => {
     for (const emp of branchEmployees) {
@@ -224,6 +241,20 @@ export function SaCommissionPanel() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Exported approved payouts for HR");
+  };
+
+  const handleExportAllReports = () => {
+    if (!cycle) {
+      toast.error("Load a cycle first");
+      return;
+    }
+    exportSaPayoutReport(cycle.payouts, month, branchId);
+    exportSaComplianceReport(cycle, getEmpName);
+    exportSaOtReport(cycle, getEmpName);
+    exportSaOtSummaryByEmployee(cycle, getEmpName);
+    exportSaKpiRanking(cycle, getEmpName);
+    exportSaStoreGoalDashboard(cycle);
+    toast.success("Exported 6 SA month reports (CSV)");
   };
 
   const goalHit = (cycle?.branchTotalSales ?? 0) >= SA_STORE_GOAL_THRESHOLD;
@@ -292,6 +323,10 @@ export function SaCommissionPanel() {
             <Button type="button" variant="outline" onClick={handleExportApproved}>
               <Download className="h-4 w-4 mr-2" />
               Export approved (HR)
+            </Button>
+            <Button type="button" variant="outline" onClick={handleExportAllReports}>
+              <Download className="h-4 w-4 mr-2" />
+              Export all reports
             </Button>
           </div>
 
@@ -395,11 +430,38 @@ export function SaCommissionPanel() {
         }}
       />
 
+      <SaOtApprovalPanel
+        month={month}
+        employees={branchEmployees.map((e) => ({ id: e.id, name: e.name }))}
+        employeeId={complianceEmpId}
+        onEmployeeChange={setComplianceEmpId}
+        approvals={otApprovals}
+        locked={complianceLocked}
+        approverEmail={currentUser.email}
+        onAdd={(approval) => {
+          ensureProfiles();
+          getOrCreateCycle(month, branchId);
+          addOtApproval(month, branchId, approval);
+          void syncCycle();
+        }}
+        onApprove={(id, by) => {
+          approveOtApproval(month, branchId, id, by);
+          void syncCycle();
+          toast.success("OT approved");
+        }}
+        onReject={(id) => {
+          rejectOtApproval(month, branchId, id);
+          void syncCycle();
+          toast.info("OT rejected");
+        }}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle>Monthly payout (draft)</CardTitle>
           <CardDescription>
-            Enter POS sales per SA and approved OT hours (comma-separated per day, max 2h/day).
+            Enter POS sales per SA. OT pay uses pre-approved cash logs when present; otherwise
+            comma-separated hours (legacy, max 2h/day).
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">

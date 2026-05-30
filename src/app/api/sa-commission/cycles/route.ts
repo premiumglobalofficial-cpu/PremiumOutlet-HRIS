@@ -12,6 +12,8 @@ function rowToCycle(row: Record<string, unknown>): SaMonthlyCycle {
     complianceDeducted: (row.compliance_deducted as SaMonthlyCycle["complianceDeducted"]) ?? {},
     complianceWeeksByEmployee:
       (row.compliance_weeks_by_employee as SaMonthlyCycle["complianceWeeksByEmployee"]) ?? {},
+    otApprovalsByEmployee:
+      (row.ot_approvals_by_employee as SaMonthlyCycle["otApprovalsByEmployee"]) ?? {},
     salesByEmployee: (row.sales_by_employee as SaMonthlyCycle["salesByEmployee"]) ?? {},
     otHoursByEmployee: (row.ot_hours_by_employee as SaMonthlyCycle["otHoursByEmployee"]) ?? {},
     kpiByEmployee: (row.kpi_by_employee as SaMonthlyCycle["kpiByEmployee"]) ?? {},
@@ -29,6 +31,7 @@ function cycleToRow(cycle: SaMonthlyCycle) {
     compliance_earned: cycle.complianceEarned,
     compliance_deducted: cycle.complianceDeducted,
     compliance_weeks_by_employee: cycle.complianceWeeksByEmployee ?? {},
+    ot_approvals_by_employee: cycle.otApprovalsByEmployee ?? {},
     sales_by_employee: cycle.salesByEmployee,
     ot_hours_by_employee: cycle.otHoursByEmployee,
     kpi_by_employee: cycle.kpiByEmployee,
@@ -108,6 +111,23 @@ export async function PUT(req: Request) {
     .upsert(cycleToRow(cycle), { onConflict: "month,branch_id" });
 
   if (cycleErr) return NextResponse.json({ error: cycleErr.message }, { status: 500 });
+
+  const otRows = Object.entries(cycle.otApprovalsByEmployee ?? {}).flatMap(
+    ([employeeId, list]) =>
+      list.map((a) => ({
+        id: a.id,
+        employee_id: employeeId,
+        work_date: a.date,
+        hours: a.hours,
+        ot_type: a.otType,
+        status: a.status,
+        approved_by: a.approvedBy ?? null,
+        approved_at: a.approvedAt ?? null,
+      })),
+  );
+  if (otRows.length > 0) {
+    await db.from("sa_ot_approvals").upsert(otRows, { onConflict: "id" });
+  }
 
   if (body.profiles?.length) {
     const profileRows = body.profiles.map((p) => ({

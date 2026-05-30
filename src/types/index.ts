@@ -245,6 +245,8 @@ export interface SaMonthlyCycle {
   complianceDeducted: Record<string, SaComplianceDeducted>;
   salesByEmployee: Record<string, number>;
   otHoursByEmployee: Record<string, number[]>;
+  /** Pre-approved OT logs per employee (cash / offset) */
+  otApprovalsByEmployee?: Record<string, SaOtApproval[]>;
   kpiByEmployee: Record<string, {
     unitsSold: number;
     revenue: number;
