@@ -11,11 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import Image from "next/image";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { DEMO_USERS } from "@/data/seed";
 import { syncDemoSessionCookie } from "@/services/demo-session.client";
+import { BRAND_LOGO_PATH, BRAND_NAME } from "@/lib/branding";
 
 // Set to true to use local demo login (no Supabase required)
 const USE_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
@@ -72,6 +72,9 @@ export default function LoginPage() {
             brandTagline: s.brandTagline,
         }))
     );
+
+    const effectiveLogo = logoUrl || BRAND_LOGO_PATH;
+    const displayName = companyName || BRAND_NAME;
 
     const handleSupabaseLogin = async (loginEmail: string, loginPassword: string) => {
         setLoading(true);
@@ -169,19 +172,11 @@ export default function LoginPage() {
                 
                 {/* Top Branding */}
                 <div className="relative z-10 flex items-center gap-3">
-                    {logoUrl ? (
-                        <div className="bg-white/10 p-2 rounded-xl backdrop-blur-md border border-white/10">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={logoUrl} alt={companyName} className="h-8 object-contain brightness-0 invert" />
-                        </div>
-                    ) : (
-                        <div className="bg-primary/20 p-2 rounded-xl backdrop-blur-md border border-primary/20">
-                            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center font-bold text-lg text-primary-foreground shadow-lg">
-                                {companyName.charAt(0)}
-                            </div>
-                        </div>
-                    )}
-                    <span className="font-bold text-xl tracking-tight">{companyName}</span>
+                    <div className="bg-white/10 p-2 rounded-xl backdrop-blur-md border border-white/10">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={effectiveLogo} alt={displayName} className="h-8 w-8 object-contain brightness-0 invert" />
+                    </div>
+                    <span className="font-bold text-xl tracking-tight">{displayName}</span>
                 </div>
 
                 {/* Center Message */}
@@ -203,7 +198,7 @@ export default function LoginPage() {
                             </div>
                         ))}
                     </div>
-                    <span>Powered by Nexvision Innovations Inc.</span>
+                    <span>© {displayName}</span>
                 </div>
             </div>
 
@@ -213,17 +208,10 @@ export default function LoginPage() {
                     
                     {/* Mobile Branding (Only visible on small screens) */}
                     <div className="lg:hidden flex flex-col items-center justify-center mb-8 space-y-4">
-                        {logoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={logoUrl} alt={companyName} className="h-16 md:h-20 w-auto object-contain max-w-[200px]" />
-                        ) : (
-                            <>
-                                <Image src="/logo.png" alt={companyName} width={200} height={80} className="h-16 md:h-20 w-auto object-contain dark:hidden" priority />
-                                <Image src="/darklogo.png" alt={companyName} width={200} height={80} className="h-16 md:h-20 w-auto object-contain hidden dark:block" priority />
-                            </>
-                        )}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={effectiveLogo} alt={displayName} className="h-16 md:h-20 w-auto object-contain max-w-[200px]" />
                         <h2 className="text-2xl font-bold tracking-tight text-foreground text-center">
-                            {companyName}
+                            {displayName}
                         </h2>
                     </div>
 

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { safePersistStorage } from "@/lib/storage";
+import { BRAND_LOGO_PATH, BRAND_NAME, BRAND_PRODUCT_NAME, isStaleBrandName } from "@/lib/branding";
 
 // ─── Color Theme Presets ──────────────────────────────────────────────────────
 
@@ -318,8 +319,8 @@ const INITIAL_STATE = {
   fontFamily: "geist" as FontFamilyId,
   radius: "md" as RadiusId,
   density: "default" as DensityId,
-  companyName: "Premium Outlets",
-  logoUrl: "",
+  companyName: BRAND_NAME,
+  logoUrl: BRAND_LOGO_PATH,
   logoTextVisible: true,
   faviconUrl: "",
   brandTagline: "",
@@ -334,7 +335,7 @@ const INITIAL_STATE = {
   loginBackground: "gradient" as LoginBackground,
   loginBgColor: "",
   loginCardStyle: "centered" as LoginCardStyle,
-  loginHeading: "Premium Outlets HRIS",
+  loginHeading: BRAND_PRODUCT_NAME,
   loginSubheading: "Sign in to your account to continue",
 };
 
@@ -388,7 +389,7 @@ export const useAppearanceStore = create<AppearanceState>()(
     }),
     {
       name: "po-hris-appearance",
-      version: 3,
+      version: 4,
       storage: safePersistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
@@ -396,24 +397,38 @@ export const useAppearanceStore = create<AppearanceState>()(
           const oldModules = (state.modules ?? {}) as Record<string, boolean>;
           state.modules = { ...DEFAULT_MODULE_FLAGS, ...oldModules };
         }
-        if (version < 3) {
-          // Reset any stale SDSI/Soren/NexHRMS branding to Premium Outlets defaults
-          const staleBrands = ["Soren Data Solutions Inc.", "Soren Data Solutions", "SDSI", "NexHRMS"];
-          if (!state.companyName || staleBrands.includes(state.companyName as string)) {
-            state.companyName = "Premium Outlets";
+        if (version < 4) {
+          if (isStaleBrandName(state.companyName as string)) {
+            state.companyName = BRAND_NAME;
           }
-          if (!state.loginHeading || staleBrands.some(b => (state.loginHeading as string).includes(b))) {
-            state.loginHeading = "Premium Outlets HRIS";
+          if (
+            !state.loginHeading ||
+            isStaleBrandName(String(state.loginHeading).replace(" HRIS", ""))
+          ) {
+            state.loginHeading = BRAND_PRODUCT_NAME;
+          }
+          const logo = state.logoUrl as string | undefined;
+          if (!logo || logo === "/logo.png" || logo === "/darklogo.png" || logo === "/logo.svg") {
+            state.logoUrl = BRAND_LOGO_PATH;
           }
         }
         return state as unknown as AppearanceState;
       },
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppearanceState>;
-        // Deep-merge modules so new defaults are always present
+        const logoUrl =
+          !p.logoUrl ||
+          p.logoUrl === "/logo.png" ||
+          p.logoUrl === "/darklogo.png" ||
+          p.logoUrl === "/logo.svg"
+            ? BRAND_LOGO_PATH
+            : p.logoUrl;
+        const companyName = isStaleBrandName(p.companyName) ? BRAND_NAME : p.companyName ?? current.companyName;
         return {
           ...current,
           ...p,
+          logoUrl,
+          companyName,
           modules: { ...DEFAULT_MODULE_FLAGS, ...(p.modules ?? {}) },
         };
       },

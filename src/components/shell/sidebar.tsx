@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
@@ -15,6 +14,7 @@ import { useMessagingStore } from "@/store/messaging.store";
 import { useNotificationsStore } from "@/store/notifications.store";
 import { useProjectsStore } from "@/store/projects.store";
 import { NAV_ITEMS, NAV_GROUPS } from "@/lib/constants";
+import { BRAND_LOGO_PATH, BRAND_NAME } from "@/lib/branding";
 import {
     LayoutDashboard,
     Users,
@@ -318,42 +318,25 @@ function SidebarComponent() {
             );
         };
 
+        const effectiveLogo = logoUrl || BRAND_LOGO_PATH;
+        const displayName = companyName || BRAND_NAME;
+
         return (
         <>
             {/* Logo */}
             <div className={cn("flex h-16 items-center px-4", showLabel || isMobile ? "justify-between" : "justify-center")}>
-                <Link href={`${rolePrefix}/dashboard`} className="flex items-center gap-2.5">
-                    {logoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={logoUrl}
-                            alt={companyName}
-                            className="sidebar-logo h-9 max-w-[140px] object-contain transition-all duration-300"
-                        />
-                    ) : (
-                        <>
-                            <Image
-                                src="/logo.png"
-                                alt={companyName}
-                                width={showLabel ? 140 : 36}
-                                height={36}
-                                className="sidebar-logo transition-all duration-300 dark:hidden"
-                                style={{ width: "auto", height: "auto", maxHeight: 36 }}
-                                priority
-                            />
-                            <Image
-                                src="/darklogo.png"
-                                alt={companyName}
-                                width={showLabel ? 140 : 36}
-                                height={36}
-                                className="sidebar-logo transition-all duration-300 hidden dark:block"
-                                style={{ width: "auto", height: "auto", maxHeight: 36 }}
-                                priority
-                            />
-                        </>
-                    )}
-                    {showLabel && logoTextVisible && logoUrl && (
-                        <span className="text-sm font-bold truncate">{companyName}</span>
+                <Link href={`${rolePrefix}/dashboard`} className="flex items-center gap-2.5 min-w-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={effectiveLogo}
+                        alt={displayName}
+                        className={cn(
+                            "sidebar-logo object-contain transition-all duration-300 shrink-0",
+                            showLabel ? "h-9 w-9" : "h-9 w-9",
+                        )}
+                    />
+                    {showLabel && logoTextVisible && (
+                        <span className="text-sm font-bold truncate leading-tight">{displayName}</span>
                     )}
                 </Link>
                 {isMobile && (
