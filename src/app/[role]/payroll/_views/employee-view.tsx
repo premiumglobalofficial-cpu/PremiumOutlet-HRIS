@@ -22,6 +22,7 @@ import { notifyPayslipSigned } from "@/lib/notifications";
 import { formatCurrency } from "@/lib/format";
 import { keysToCamel } from "@/lib/db-utils";
 import { useAppearanceStore } from "@/store/appearance.store";
+import { SaEmployeeIncentivesView } from "@/components/payroll/sa-employee-incentives-view";
 
 /* ═══════════════════════════════════════════════════════════════
    EMPLOYEE PAYROLL VIEW — "My Payslips"
@@ -155,8 +156,39 @@ export default function EmployeePayrollView() {
         <div className="space-y-6">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold tracking-tight">My Payslips</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">{myPayslips.length} payslip{myPayslips.length !== 1 ? "s" : ""}</p>
+                <h1 className="text-2xl font-bold tracking-tight">My Payroll</h1>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                    Payslips, e-signatures, and SA incentives
+                </p>
+            </div>
+
+            <Tabs defaultValue="payslips">
+                <TabsList>
+                    <TabsTrigger value="payslips">My Payslips</TabsTrigger>
+                    <TabsTrigger value="sa-incentives" className="gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        SA Incentives
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="sa-incentives" className="mt-4">
+                    {myEmployee ? (
+                        <SaEmployeeIncentivesView
+                            employeeId={myEmployee.id}
+                            employeeName={myEmployee.name}
+                        />
+                    ) : (
+                        <Card className="border-dashed">
+                            <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                                Link your account to an employee profile to view SA incentives.
+                            </CardContent>
+                        </Card>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="payslips" className="mt-4 space-y-6">
+            <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">{myPayslips.length} payslip{myPayslips.length !== 1 ? "s" : ""}</p>
             </div>
 
             {/* Pending Actions Banner */}
@@ -382,6 +414,8 @@ export default function EmployeePayrollView() {
                             </div>
                         </CardContent>
                     </Card>
+                </TabsContent>
+            </Tabs>
                 </TabsContent>
             </Tabs>
 

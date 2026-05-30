@@ -1,4 +1,4 @@
-import type { SaEmployeeProfile, SaMonthlyCycle } from "@/types";
+import type { SaEmployeeProfile, SaMonthlyCycle, SaPayoutRecord } from "@/types";
 
 export async function fetchSaCycle(
   month: string,
@@ -11,6 +11,21 @@ export async function fetchSaCycle(
   if (!res.ok) return null;
   const data = (await res.json()) as { cycle?: SaMonthlyCycle | null };
   return data.cycle ?? null;
+}
+
+export async function fetchMySaPayout(
+  month: string,
+): Promise<{ payout: SaPayoutRecord | null; employeeId?: string }> {
+  const res = await fetch(
+    `/api/sa-commission/my-payout?month=${encodeURIComponent(month)}`,
+    { credentials: "include", cache: "no-store" },
+  );
+  if (!res.ok) return { payout: null };
+  const data = (await res.json()) as {
+    payout?: SaPayoutRecord | null;
+    employeeId?: string;
+  };
+  return { payout: data.payout ?? null, employeeId: data.employeeId };
 }
 
 export async function persistSaCycle(

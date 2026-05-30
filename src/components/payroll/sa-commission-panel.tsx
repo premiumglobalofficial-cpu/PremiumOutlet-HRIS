@@ -35,8 +35,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CheckCircle, Download, Info, Sparkles } from "lucide-react";
+import { CheckCircle, Download, Info, Sparkles, BookOpen, Settings2 } from "lucide-react";
 import { SA_EOM_BLOCKED_REASON } from "@/lib/sa-eom-policy";
+import { SaIncentivesReferenceTables } from "@/components/payroll/sa-incentives-reference-tables";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SaEmploymentType } from "@/types";
 
 const BRANCHES = [
@@ -225,6 +227,23 @@ export function SaCommissionPanel() {
 
   return (
     <div className="space-y-6">
+      <Tabs defaultValue="operations" className="w-full">
+        <TabsList className="flex flex-wrap h-auto gap-1 mb-2">
+          <TabsTrigger value="operations" className="gap-1.5">
+            <Settings2 className="h-3.5 w-3.5" />
+            Operations
+          </TabsTrigger>
+          <TabsTrigger value="policy" className="gap-1.5">
+            <BookOpen className="h-3.5 w-3.5" />
+            Policy &amp; Points Reference
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="policy" className="mt-0">
+          <SaIncentivesReferenceTables audience="admin" />
+        </TabsContent>
+
+        <TabsContent value="operations" className="mt-0 space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -518,6 +537,8 @@ export function SaCommissionPanel() {
           </Table>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
