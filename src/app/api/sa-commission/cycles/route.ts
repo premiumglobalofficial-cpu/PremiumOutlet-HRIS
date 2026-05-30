@@ -72,6 +72,7 @@ export async function GET(req: Request) {
     breakdown: p.breakdown,
     approvedBy: p.approved_by ?? undefined,
     approvedAt: p.approved_at ?? undefined,
+    processedAt: p.processed_at ?? undefined,
   }));
 
   return NextResponse.json({ cycle: { ...cycle, payouts }, payouts });
@@ -127,6 +128,7 @@ export async function PUT(req: Request) {
       breakdown: p.breakdown,
       approved_by: p.approvedBy ?? null,
       approved_at: p.approvedAt ?? null,
+      processed_at: p.processedAt ?? (p.status === "processed" ? new Date().toISOString() : null),
       updated_at: new Date().toISOString(),
     }));
     const { error: payoutErr } = await db

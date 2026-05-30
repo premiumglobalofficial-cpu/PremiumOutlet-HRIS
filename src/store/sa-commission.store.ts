@@ -264,6 +264,7 @@ export const useSaCommissionStore = create<SaCommissionState>()(
             breakdown,
             approvedBy: prev?.approvedBy,
             approvedAt: prev?.approvedAt,
+            processedAt: prev?.processedAt,
           };
         });
 
@@ -321,6 +322,7 @@ export const useSaCommissionStore = create<SaCommissionState>()(
 
       markPayoutsProcessed: (month, employeeIds) => {
         const idSet = new Set(employeeIds);
+        const now = new Date().toISOString();
         set((s) => ({
           cycles: s.cycles.map((c) =>
             c.month !== month
@@ -329,10 +331,10 @@ export const useSaCommissionStore = create<SaCommissionState>()(
                   ...c,
                   payouts: c.payouts.map((p) =>
                     idSet.has(p.employeeId) && p.status === "approved"
-                      ? { ...p, status: "processed" as const }
+                      ? { ...p, status: "processed" as const, processedAt: now }
                       : p,
                   ),
-                  updatedAt: new Date().toISOString(),
+                  updatedAt: now,
                 },
           ),
         }));

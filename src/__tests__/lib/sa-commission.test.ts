@@ -217,6 +217,43 @@ describe("SA grand total & payroll bridge", () => {
     expect(payout.storeGoalShare).toBe(0);
     expect(toPayrollIncentiveAllowances(payout)).toBe(0);
   });
+
+  /** SAincentives.md § Sample Month — Kim, June 2026, branch hit P6M */
+  it("matches Kim sample month (EXCELLENT + 24h OT + GOLD compliance)", () => {
+    const earned: SaComplianceEarned = {
+      ...emptyEarned(),
+      attendanceWeeks: 4,
+      groomingWeeks: 4,
+      floorWeeks: 4,
+      photoWeeks: 4,
+      groupchatWeeks: 4,
+      commitmentWeeks: 4,
+      trainingSessions: 4,
+      cashierWeeks: 4,
+      highestSalesWins: 1,
+    };
+    const kim = buildMonthlySaPayout({
+      employeeId: "kim",
+      month: "2026-06",
+      employmentType: "regular",
+      salesTotal: 1_250_000,
+      approvedOtHoursPerDay: Array(15).fill(2),
+      complianceEarned: earned,
+      complianceDeducted: emptyDeducted(),
+      storeGoalShare: 500,
+    });
+    expect(kim.salesLevel).toBe("EXCELLENT");
+    expect(kim.salesCommission).toBe(1_500);
+    expect(kim.otPay).toBeCloseTo(24 * SA_OT_RATE, 2);
+    expect(kim.complianceScore).toBeGreaterThanOrEqual(260);
+    expect(kim.complianceTier).toBe("GOLD");
+    expect(kim.complianceCash).toBe(1_000);
+    expect(kim.complianceGc).toBe(500);
+    expect(kim.complianceRice).toBe(400);
+    expect(kim.nonCashTotal).toBe(900);
+    expect(toPayrollIncentiveAllowances(kim)).toBeCloseTo(5_212.5, 0);
+    expect(kim.cashTotal).toBeCloseTo(15_340 + 5_212.5, 0);
+  });
 });
 
 describe("helpers", () => {

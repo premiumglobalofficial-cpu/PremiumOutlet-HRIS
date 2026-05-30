@@ -716,12 +716,17 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
             if (saProcessedIds.length > 0) {
                 markSaPayoutsProcessed(saPayMonth, saProcessedIds);
                 const saState = useSaCommissionStore.getState();
-                for (const c of saState.cycles.filter((x) => x.month === saPayMonth)) {
-                    void persistSaCycle(
-                        c,
-                        saState.profiles.filter((p) => p.branchId === c.branchId),
-                    );
-                }
+                void (async () => {
+                    for (const c of saState.cycles.filter((x) => x.month === saPayMonth)) {
+                        const result = await persistSaCycle(
+                            c,
+                            saState.profiles.filter((p) => p.branchId === c.branchId),
+                        );
+                        if (!result.ok) {
+                            toast.error(result.error ?? "SA payout status failed to sync to database");
+                        }
+                    }
+                })();
             }
 
             const loanMsg = totalLoanDeductions > 0 ? ` (incl. ${formatCurrency(totalLoanDeductions)} total loan deductions)` : "";

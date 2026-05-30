@@ -266,6 +266,7 @@ export interface SaPayoutRecord {
   breakdown: SaMonthlyPayoutBreakdown;
   approvedBy?: string;
   approvedAt?: string;
+  processedAt?: string;
 }
 
 // ─── Payroll Signature Configuration ─────────────────────────
