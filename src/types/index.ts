@@ -1033,7 +1033,7 @@ export interface BreakRecord {
   id: string;
   employeeId: string;
   date: string;
-  breakType: "lunch" | "other";
+  breakType: "lunch" | "dinner" | "other";
   startTime: string;
   endTime?: string;
   startLat?: number;

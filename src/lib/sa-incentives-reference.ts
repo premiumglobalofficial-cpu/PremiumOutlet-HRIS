@@ -336,3 +336,5 @@ export const SA_SAMPLE_MONTH_KIM = {
   breakReminder:
     "Break = 1 hour per shift (45 min lunch + 15 min dinner). Unpaid. Scheduled by assigned person by COO. Floor must always have coverage.",
 };
+
+export { SA_BREAK_REMINDER } from "@/lib/break-policy";

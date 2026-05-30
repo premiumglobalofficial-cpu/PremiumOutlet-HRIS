@@ -8,6 +8,8 @@
 
 import { locationDb } from "./db.service";
 import { useLocationStore } from "@/store/location.store";
+import type { SaBreakType } from "@/lib/break-policy";
+import { breakDurationMinutes } from "@/lib/break-policy";
 import type { LocationPing, SiteSurveyPhoto, BreakRecord, LocationTrackingConfig } from "@/types";
 import { nanoid } from "nanoid";
 
@@ -99,7 +101,7 @@ export async function addPhoto(data: Omit<SiteSurveyPhoto, "id">): Promise<{ ok:
  */
 export async function startBreak(data: {
     employeeId: string;
-    breakType: "lunch" | "other";
+    breakType: SaBreakType;
     lat?: number;
     lng?: number;
 }): Promise<{ ok: boolean; id?: string }> {
@@ -142,7 +144,10 @@ export async function endBreak(
         (new Date(endTime).getTime() - new Date(existing.startTime).getTime()) / 60000
     );
     const config = store.config;
-    const overtime = duration > config.lunchDuration + config.lunchOvertimeThreshold;
+    const limit =
+        breakDurationMinutes(existing.breakType as SaBreakType, config.lunchDuration) +
+        config.lunchOvertimeThreshold;
+    const overtime = duration > limit;
 
     const updated: BreakRecord = {
         ...existing,

@@ -1,6 +1,8 @@
 "use client";
 import { create } from "zustand";
 import { nanoid } from "nanoid";
+import type { SaBreakType } from "@/lib/break-policy";
+import { breakDurationMinutes, SA_LUNCH_BREAK_MINUTES } from "@/lib/break-policy";
 import type {
     SiteSurveyPhoto,
     BreakRecord,
@@ -25,12 +27,12 @@ const DEFAULT_CONFIG: LocationTrackingConfig = {
     selfieMaxAge: 60,
     showReverseGeocode: true,
     selfieCompressionQuality: 0.6,
-    // Break / Lunch
-    lunchDuration: 60,
+    // Break / Lunch (DOLE: 45 min lunch + 15 min dinner = 1 hr unpaid)
+    lunchDuration: SA_LUNCH_BREAK_MINUTES,
     lunchGeofenceRequired: true,
     lunchOvertimeThreshold: 5,
     alertAdminOnGeofenceViolation: true,
-    allowedBreaksPerDay: 1,
+    allowedBreaksPerDay: 2,
     breakGracePeriod: 5,
 };
 
@@ -56,7 +58,7 @@ interface LocationState {
     purgeOldPhotos: () => void;
 
     // Break records
-    startBreak: (data: { employeeId: string; breakType: "lunch" | "other"; lat?: number; lng?: number }) => string;
+    startBreak: (data: { employeeId: string; breakType: SaBreakType; lat?: number; lng?: number }) => string;
     endBreak: (breakId: string, data: { lat?: number; lng?: number; geofencePass?: boolean; distanceFromSite?: number }) => void;
     getActiveBreak: (employeeId: string) => BreakRecord | undefined;
     getBreaks: (employeeId: string, date?: string) => BreakRecord[];
@@ -148,7 +150,10 @@ export const useLocationStore = create<LocationState>()(
                             (new Date(endTime).getTime() - new Date(b.startTime).getTime()) / 60000
                         );
                         const config = s.config;
-                        const overtime = duration > config.lunchDuration + config.lunchOvertimeThreshold;
+                        const limit =
+                          breakDurationMinutes(b.breakType as SaBreakType, config.lunchDuration) +
+                          config.lunchOvertimeThreshold;
+                        const overtime = duration > limit;
                         return {
                             ...b,
                             endTime,

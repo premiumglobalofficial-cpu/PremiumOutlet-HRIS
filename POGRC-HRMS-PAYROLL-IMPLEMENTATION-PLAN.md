@@ -196,6 +196,7 @@ non_cash =
 - [x] OT approval UI (`sa_ot_approvals` table + pre-approval log panel)
 - [x] Weekly compliance per-week UI (4-week grid + DB jsonb)
 - [x] SA employee self-service view (My Payslips → SA Incentives)
+- [x] SA employee full picture (Component / Amount / How), points, violations, history
 - [x] HR report exports (6 CSV reports via Export all reports)
 
 ### Phase 3 — Reports (6 outputs from brief)
