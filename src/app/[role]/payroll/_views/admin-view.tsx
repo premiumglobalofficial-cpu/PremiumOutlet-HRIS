@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { usePayrollStore } from "@/store/payroll.store";
 import { useEmployeesStore } from "@/store/employees.store";
 import { useAuthStore } from "@/store/auth.store";
@@ -276,6 +277,19 @@ export default function AdminPayrollView({ mode = "admin" }: AdminPayrollViewPro
     const [empSearchTerm, setEmpSearchTerm] = useState("");
     const [includeSaIncentives, setIncludeSaIncentives] = useState(true);
     const [payrollTab, setPayrollTab] = useState("payroll");
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        const tab = searchParams.get("tab");
+        if (
+            tab &&
+            (tab === "payroll" ||
+                (canIssue &&
+                  ["deductions", "settings", "tax-settings", "gov-reports", "sa-incentives"].includes(tab)))
+        ) {
+            setPayrollTab(tab);
+        }
+    }, [searchParams, canIssue]);
     const filteredActiveEmployees = useMemo(() => {
         if (!empSearchTerm.trim()) return activeEmployees;
         const q = empSearchTerm.toLowerCase();

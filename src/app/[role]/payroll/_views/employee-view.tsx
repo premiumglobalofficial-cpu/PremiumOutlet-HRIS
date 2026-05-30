@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { usePayrollStore } from "@/store/payroll.store";
 import { useEmployeesStore } from "@/store/employees.store";
 import { useAuthStore } from "@/store/auth.store";
@@ -47,6 +48,15 @@ export default function EmployeePayrollView() {
     const [printPayslipId, setPrintPayslipId] = useState<string | null>(null);
     const [signingInProgress, setSigningInProgress] = useState(false);
     const [acknowledging, setAcknowledging] = useState(false);
+    const searchParams = useSearchParams();
+    const [payrollTab, setPayrollTab] = useState("payslips");
+
+    useEffect(() => {
+        const tab = searchParams.get("tab");
+        if (tab === "sa-incentives" || tab === "payslips") {
+            setPayrollTab(tab);
+        }
+    }, [searchParams]);
 
     const myEmployee = useMemo(() => {
         const match = employees.find(
@@ -162,7 +172,7 @@ export default function EmployeePayrollView() {
                 </p>
             </div>
 
-            <Tabs defaultValue="payslips">
+            <Tabs value={payrollTab} onValueChange={setPayrollTab}>
                 <TabsList>
                     <TabsTrigger value="payslips">My Payslips</TabsTrigger>
                     <TabsTrigger value="sa-incentives" className="gap-1.5">

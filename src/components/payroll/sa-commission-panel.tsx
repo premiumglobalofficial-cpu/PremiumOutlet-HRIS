@@ -35,10 +35,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CheckCircle, Download, Info, Sparkles, BookOpen, Settings2 } from "lucide-react";
+import { CheckCircle, Download, Eye, Info, Sparkles, BookOpen, Settings2 } from "lucide-react";
 import { SA_EOM_BLOCKED_REASON, getSaVariableCapWarning } from "@/lib/sa-eom-policy";
 import { SaIncentivesReferenceTables } from "@/components/payroll/sa-incentives-reference-tables";
 import { SaOtApprovalPanel } from "@/components/payroll/sa-ot-approval-panel";
+import { SaPayoutBreakdownTable } from "@/components/payroll/sa-payout-breakdown-table";
+import { resolveOtHoursForPayout } from "@/lib/sa-ot-approvals";
 import {
   exportSaComplianceReport,
   exportSaKpiRanking,
@@ -47,8 +49,21 @@ import {
   exportSaPayoutReport,
   exportSaStoreGoalDashboard,
 } from "@/lib/sa-report-export";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import type { SaEmploymentType } from "@/types";
+
+const BRANCH_LABELS: Record<string, string> = {
+  main: "POGRC (Mega Annex)",
+  north: "North Branch",
+  south: "South Branch",
+};
 
 const BRANCHES = [
   { id: "main", label: "Main Branch" },
@@ -82,6 +97,7 @@ export function SaCommissionPanel() {
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
   const [branchId, setBranchId] = useState("main");
   const [complianceEmpId, setComplianceEmpId] = useState("");
+  const [breakdownEmpId, setBreakdownEmpId] = useState<string | null>(null);
 
   const cycle = useMemo(
     () => cycles.find((c) => c.month === month && c.branchId === branchId),
@@ -182,6 +198,20 @@ export function SaCommissionPanel() {
     () => Object.values(cycle?.otApprovalsByEmployee ?? {}).flat(),
     [cycle?.otApprovalsByEmployee],
   );
+  const breakdownEmployee = useMemo(
+    () => branchEmployees.find((e) => e.id === breakdownEmpId),
+    [branchEmployees, breakdownEmpId],
+  );
+  const breakdownPayout = useMemo(
+    () => cycle?.payouts.find((p) => p.employeeId === breakdownEmpId),
+    [cycle, breakdownEmpId],
+  );
+  const breakdownOtHours = useMemo(() => {
+    if (!breakdownEmpId || !cycle) return 0;
+    const approvals = cycle.otApprovalsByEmployee?.[breakdownEmpId] ?? [];
+    const manual = cycle.otHoursByEmployee[breakdownEmpId] ?? [];
+    return resolveOtHoursForPayout(approvals, month, manual).reduce((s, h) => s + h, 0);
+  }, [breakdownEmpId, cycle, month]);
   const getEmpName = (id: string) => employees.find((e) => e.id === id)?.name ?? id;
 
   const ensureProfiles = () => {
@@ -596,6 +626,18 @@ export function SaCommissionPanel() {
                         {formatCurrency(b ? toPayrollIncentiveAllowances(b) : 0)}
                       </TableCell>
                       <TableCell>
+                        <div className="flex flex-col gap-1">
+                          {b && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-[10px] px-2 justify-start"
+                              onClick={() => setBreakdownEmpId(emp.id)}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              Full picture
+                            </Button>
+                          )}
                         {payout?.status === "processed" ? (
                           <Badge variant="default">Processed</Badge>
                         ) : payout?.status === "approved" ? (
@@ -630,6 +672,7 @@ export function SaCommissionPanel() {
                             Approve
                           </Button>
                         )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -641,6 +684,28 @@ export function SaCommissionPanel() {
       </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!breakdownEmpId} onOpenChange={(open) => !open && setBreakdownEmpId(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-violet-600" />
+              FULL PICTURE — {breakdownEmployee?.name ?? "SA"}
+            </DialogTitle>
+          </DialogHeader>
+          {breakdownPayout?.breakdown && breakdownEmpId && (
+            <SaPayoutBreakdownTable
+              employeeName={breakdownEmployee?.name ?? breakdownEmpId}
+              month={month}
+              branchLabel={BRANCH_LABELS[branchId] ?? branchId}
+              storeGoalHit={(cycle?.branchTotalSales ?? 0) >= SA_STORE_GOAL_THRESHOLD}
+              salesTotal={cycle?.salesByEmployee[breakdownEmpId] ?? breakdownPayout.breakdown.salesTotal}
+              otHoursTotal={breakdownOtHours}
+              breakdown={breakdownPayout.breakdown}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

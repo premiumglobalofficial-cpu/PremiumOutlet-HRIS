@@ -28,6 +28,7 @@ import {
     Tooltip as RechartsTooltip, PieChart, Pie, Cell, AreaChart, Area,
 } from "recharts";
 import { isToday, parseISO, isAfter, startOfDay, format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns";
+import { AdminSaIncentivesCard } from "@/components/dashboard/admin-sa-incentives-card";
 
 /* ─── Main Component ─────────────────────────────────────────── */
 
@@ -44,7 +45,7 @@ export function AdminDashboard() {
                         Welcome back, {currentUser.name.split(" ")[0]}!
                     </h1>
                     <p className="text-muted-foreground text-sm mt-0.5">
-                        Full system overview — employees, attendance, payroll, and financials.
+                        Full system overview — employees, attendance, payroll, SA incentives, and financials.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -78,6 +79,9 @@ export function AdminDashboard() {
                 <PayrollSummaryCard />
                 <RecentHiresCard />
             </div>
+
+            {/* Row 3b: SA Incentives branch overview */}
+            <AdminSaIncentivesCard />
 
             {/* Row 4: Upcoming Events + Birthdays */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

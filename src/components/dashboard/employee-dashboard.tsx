@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { parseISO, isAfter, startOfDay, isToday, format } from "date-fns";
+import { EmployeeSaIncentivesCard } from "@/components/dashboard/employee-sa-incentives-card";
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 
@@ -52,7 +53,7 @@ export function EmployeeDashboard() {
                     Welcome back, {currentUser.name.split(" ")[0]}!
                 </h1>
                 <p className="text-muted-foreground text-sm mt-1">
-                    Your personal workspace — attendance, leave, and payslips.
+                    Your personal workspace — attendance, leave, payslips, and SA incentives.
                 </p>
             </div>
 
@@ -67,6 +68,9 @@ export function EmployeeDashboard() {
 
             {/* Row 2: Leave Balance (full width) */}
             <LeaveBalanceCard />
+
+            {/* Row 2b: SA Incentives (Sales Associates only) */}
+            <EmployeeSaIncentivesCard />
 
             {/* Row 3: Latest Payslip + Leave Requests */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
